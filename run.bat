@@ -6,6 +6,13 @@ cd /d "%~dp0"
 for /f %%a in ('echo prompt $E^| cmd') do set "ESC=%%a"
 set "PURPLE=%ESC%[95m"
 set "RESET=%ESC%[0m"
+set "NODE_TLS_REJECT_UNAUTHORIZED="
+set "FORCE_COLOR=1"
+if defined NODE_OPTIONS (
+    set "NODE_OPTIONS=--use-system-ca !NODE_OPTIONS!"
+) else (
+    set "NODE_OPTIONS=--use-system-ca"
+)
 
 where node >nul 2>nul
 if errorlevel 1 (
@@ -29,68 +36,6 @@ echo %PURPLE%=========================================%RESET%
 echo %PURPLE%          Kahoot Bot Launcher%RESET%
 echo %PURPLE%=========================================%RESET%
 echo.
-echo [1] Numbered names    example: hit 1, hit 2, hit 3
-echo [2] Custom names list example: lucas,mia,noah
-echo.
-set /p "mode=Choose mode [1 or 2]: "
-
-if not "!mode!"=="1" if not "!mode!"=="2" (
-    echo Invalid mode. Use 1 or 2.
-    pause
-    exit /b 1
-)
-
-set /p "pin=Game PIN: "
-
-if "!pin!"=="" (
-    echo PIN is required.
-    pause
-    exit /b 1
-)
-
-for /f "delims=0123456789" %%a in ("!pin!") do (
-    echo PIN must be a number.
-    pause
-    exit /b 1
-)
-
-if "!mode!"=="2" (
-    set /p "names=Names comma-separated: "
-    if "!names!"=="" (
-        echo Names are required.
-        pause
-        exit /b 1
-    )
-    echo.
-    echo Starting: node index.js !pin! --names "!names!"
-    node index.js !pin! --names "!names!"
-    pause
-    exit /b %errorlevel%
-)
-
-set /p "count=How many bots: "
-set /p "base=Base name: "
-
-if "!count!"=="" (
-    echo Count is required.
-    pause
-    exit /b 1
-)
-
-for /f "delims=0123456789" %%a in ("!count!") do (
-    echo Count must be a number.
-    pause
-    exit /b 1
-)
-
-if "!base!"=="" (
-    echo Base name is required.
-    pause
-    exit /b 1
-)
-
-echo.
-echo Starting: node index.js !pin! !count! "!base!"
-node index.js !pin! !count! "!base!"
+node index.js
 pause
 exit /b %errorlevel%

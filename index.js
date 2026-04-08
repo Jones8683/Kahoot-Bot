@@ -1,51 +1,77 @@
 "use strict";
 
+const readline = require("readline");
 const Kahoot = require("kahoot.js-latest");
 
-const args = process.argv.slice(2);
-const pinRaw = args[0];
-const namesFlagIndex = args.indexOf("--names");
-const customNamesRaw =
-  namesFlagIndex >= 0 ? args[namesFlagIndex + 1] || "" : "";
-const customNames = customNamesRaw
-  .split(",")
-  .map((name) => name.trim())
-  .filter(Boolean);
-const countRaw = customNames.length > 0 ? String(customNames.length) : args[1];
-const baseName = customNames.length > 0 ? "" : (args[2] || "").trim();
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
 
-if (
-  !pinRaw ||
-  (!countRaw && customNames.length === 0) ||
-  (customNames.length === 0 && !baseName)
-) {
-  console.log("Usage: node index.js <pin> <count> <name>");
-  console.log('   or: node index.js <pin> --names "name1,name2,name3"');
-  process.exit(1);
+const C = {
+  reset: "\x1b[0m",
+  green: "\x1b[92m",
+  purple: "\x1b[95m",
+  cyan: "\x1b[96m",
+  gray: "\x1b[90m",
+};
+
+function paint(color, text) {
+  return `${color}${text}${C.reset}`;
 }
 
-const pin = Number.parseInt(pinRaw, 10);
-const count =
-  customNames.length > 0 ? customNames.length : Number.parseInt(countRaw, 10);
-
-if (!Number.isFinite(pin) || pin <= 0) {
-  console.log("Invalid pin");
-  process.exit(1);
+function status(symbol, color, text) {
+  return `${paint(color, symbol)}  ${text}`;
 }
 
-if (!Number.isFinite(count) || count <= 0) {
-  console.log("Invalid count");
-  process.exit(1);
-}
+const clients = new Map();
+let gamePin = 0;
+let waitingForPrompt = false;
+const pendingAsyncLogs = [];
 
-function makeName(index) {
-  if (customNames.length > 0) {
-    return customNames[index];
+function printLine(message, isAsyncEvent = false) {
+  if (isAsyncEvent && waitingForPrompt) {
+    pendingAsyncLogs.push(message);
+    return;
   }
-  if (count === 1) {
-    return baseName;
+  console.log(message);
+}
+
+function ask(question) {
+  return new Promise((resolve) => {
+    waitingForPrompt = true;
+    rl.question(question, (answer) => {
+      waitingForPrompt = false;
+      if (pendingAsyncLogs.length > 0) {
+        process.stdout.write("\n");
+        while (pendingAsyncLogs.length > 0) {
+          console.log(pendingAsyncLogs.shift());
+        }
+      }
+      resolve(answer.trim());
+    });
+  });
+}
+
+function parsePin(value) {
+  const pin = Number.parseInt(value, 10);
+  if (!Number.isFinite(pin) || pin <= 0) {
+    return 0;
   }
-  return `${baseName} ${index + 1}`;
+  return pin;
+}
+
+function formatError(err) {
+  if (err && err.description) {
+    return err.description;
+  }
+  if (err && err.message) {
+    return err.message;
+  }
+  if (typeof err === "string") {
+    return err;
+  }
+  return "unknown error";
 }
 
 function randomAnswer(question) {
@@ -73,39 +99,91 @@ function randomAnswer(question) {
   return Math.floor(Math.random() * 4);
 }
 
-function startBot(index) {
-  const name = makeName(index);
+async function addPlayer(name) {
+  if (clients.has(name)) {
+    printLine(status("!", C.cyan, `${name} already connected.`), true);
+    return false;
+  }
+
   const client = new Kahoot();
-
-  console.log(`Joining ${name}...`);
-
-  client.on("Joined", () => {
-    console.log(`[${name}] joined`);
-  });
+  clients.set(name, client);
 
   client.on("QuestionStart", (question) => {
     client.answer(randomAnswer(question)).catch(() => {});
   });
 
-  client.on("QuizEnd", () => {
-    console.log(`[${name}] quiz ended`);
-  });
-
   client.on("Disconnect", (reason) => {
-    console.log(`[${name}] disconnected: ${reason || "unknown"}`);
+    clients.delete(name);
+    printLine(
+      status("!", C.gray, `${name} disconnected: ${reason || "unknown"}`),
+      true,
+    );
   });
 
-  client.join(pin, name).catch((err) => {
-    const msg =
-      err && err.description
-        ? err.description
-        : err && err.message
-          ? err.message
-          : err;
-    console.log(`[${name}] failed: ${msg || "unknown error"}`);
-  });
+  try {
+    await client.join(gamePin, name);
+    printLine(status("✓", C.green, `${name} connected.`), true);
+    return true;
+  } catch (err) {
+    clients.delete(name);
+    const message = formatError(err);
+    if (message.toLowerCase().includes("duplicate name")) {
+      printLine(status("✖", C.purple, `${name} failed: duplicate name`), true);
+      return false;
+    }
+    printLine(status("✖", C.purple, `${name} failed: ${message}`), true);
+    return false;
+  }
 }
 
-for (let i = 0; i < count; i += 1) {
-  startBot(i);
+function closeAll() {
+  for (const client of clients.values()) {
+    try {
+      client.leave(true);
+    } catch (_err) {}
+  }
+  clients.clear();
 }
+
+process.on("SIGINT", () => {
+  closeAll();
+  rl.close();
+  process.exit(0);
+});
+
+async function main() {
+  while (!gamePin) {
+    const pinInput = await ask("Enter game pin: ");
+    const pin = parsePin(pinInput);
+    if (!pin) {
+      printLine(status("✖", C.purple, "PIN must be a number."));
+      continue;
+    }
+    gamePin = pin;
+  }
+
+  printLine("Type names. Type exit to leave.");
+  while (true) {
+    const name = await ask("Player name: ");
+
+    if (!name) {
+      continue;
+    }
+
+    if (name.toLowerCase() === "exit") {
+      break;
+    }
+
+    await addPlayer(name);
+  }
+
+  closeAll();
+  rl.close();
+}
+
+main().catch((err) => {
+  printLine(status("✖", C.purple, `Error: ${formatError(err)}`));
+  closeAll();
+  rl.close();
+  process.exit(1);
+});
