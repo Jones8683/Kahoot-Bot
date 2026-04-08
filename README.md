@@ -21,9 +21,9 @@ Double-click `run.bat`
 Flow:
 
 1. Enter the Kahoot game pin.
-2. Type user names. Type exit to leave.
-4. You will see a success or failure line for each name.
-5. Keep adding players as long as you want.
+2. Type bot names. Type exit to leave.
+3. You will see a success or failure line for each bot.
+4. Keep adding bots as long as you want.
 
 ### Run From Terminal
 

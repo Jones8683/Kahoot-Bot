@@ -99,9 +99,9 @@ function randomAnswer(question) {
   return Math.floor(Math.random() * 4);
 }
 
-async function addPlayer(name) {
+async function addBot(name) {
   if (clients.has(name)) {
-    printLine(status("!", C.cyan, `${name} already connected.`), true);
+    printLine(status("!", C.cyan, `${name} bot already connected.`), true);
     return false;
   }
 
@@ -128,10 +128,13 @@ async function addPlayer(name) {
     clients.delete(name);
     const message = formatError(err);
     if (message.toLowerCase().includes("duplicate name")) {
-      printLine(status("✖", C.purple, `${name} failed: duplicate name`), true);
+      printLine(
+        status("⚠", C.purple, `${name} failed: duplicate bot name`),
+        true,
+      );
       return false;
     }
-    printLine(status("✖", C.purple, `${name} failed: ${message}`), true);
+    printLine(status("⚠", C.purple, `${name} failed: ${message}`), true);
     return false;
   }
 }
@@ -156,15 +159,15 @@ async function main() {
     const pinInput = await ask("Enter game pin: ");
     const pin = parsePin(pinInput);
     if (!pin) {
-      printLine(status("✖", C.purple, "PIN must be a number."));
+      printLine(status("⚠", C.purple, "PIN must be a number."));
       continue;
     }
     gamePin = pin;
   }
 
-  printLine("Type names. Type exit to leave.");
+  printLine("Type bot names. Type exit to leave.");
   while (true) {
-    const name = await ask("Player name: ");
+    const name = await ask("Bot name: ");
 
     if (!name) {
       continue;
@@ -174,7 +177,7 @@ async function main() {
       break;
     }
 
-    await addPlayer(name);
+    await addBot(name);
   }
 
   closeAll();
@@ -182,7 +185,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  printLine(status("✖", C.purple, `Error: ${formatError(err)}`));
+  printLine(status("⚠", C.purple, `Error: ${formatError(err)}`));
   closeAll();
   rl.close();
   process.exit(1);
