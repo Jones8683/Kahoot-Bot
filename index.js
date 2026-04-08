@@ -1,56 +1,183 @@
 "use strict";
 
-const readline = require("readline");
+const blessed = require("blessed");
 const Kahoot = require("kahoot.js-latest");
 
-const C = {
-  reset: "\x1b[0m",
-  green: "\x1b[92m",
-  purple: "\x1b[95m",
-  cyan: "\x1b[96m",
-  gray: "\x1b[90m",
-};
-
-function paint(color, text) {
-  return `${color}${text}${C.reset}`;
-}
-
-function status(symbol, color, text) {
-  return `${paint(color, symbol)}  ${text}`;
-}
-
 const clients = new Map();
+const joinedBots = new Set();
+const pendingBots = new Set();
 let gamePin = 0;
-let enteringPin = true;
-let busy = false;
+let waitingForPin = true;
 let inputBuffer = "";
+let cursorIndex = 0;
+let inputScroll = 0;
 
-function promptText() {
-  return enteringPin ? "Enter game pin: " : "Bot name: ";
+const screen = blessed.screen({
+  smartCSR: true,
+  title: "Kahoot Bot",
+  cursor: {
+    artificial: false,
+    shape: "line",
+    blink: true,
+  },
+});
+
+const header = blessed.box({
+  top: 0,
+  left: 0,
+  width: "100%",
+  height: 3,
+  tags: true,
+  padding: { left: 1, right: 1 },
+  content: "{bold}Kahoot Bot{/bold}\nAdd bot names Type exit to leave",
+  border: { type: "line" },
+  style: {
+    fg: "white",
+    bg: "#240a3d",
+    border: { fg: "magenta" },
+    label: { fg: "magenta", bold: true },
+  },
+});
+
+const botsBox = blessed.box({
+  top: 3,
+  left: 0,
+  width: "40%",
+  bottom: 3,
+  tags: true,
+  padding: { left: 1, right: 1 },
+  label: " Joined Bots ",
+  border: { type: "line" },
+  content: "(none)",
+  scrollable: true,
+  alwaysScroll: true,
+  style: {
+    fg: "white",
+    bg: "#3a320f",
+    border: { fg: "yellow" },
+    label: { fg: "yellow", bold: true },
+  },
+});
+
+const logsBox = blessed.log({
+  top: 3,
+  left: "40%",
+  width: "60%",
+  bottom: 3,
+  tags: true,
+  padding: { left: 1, right: 1 },
+  label: " Status ",
+  border: { type: "line" },
+  scrollable: true,
+  alwaysScroll: true,
+  mouse: true,
+  scrollbar: { bg: "gray" },
+  style: {
+    fg: "white",
+    bg: "#4a3f10",
+    border: { fg: "yellow" },
+    label: { fg: "yellow", bold: true },
+  },
+});
+
+const inputBox = blessed.box({
+  bottom: 0,
+  left: 0,
+  width: "100%",
+  height: 3,
+  tags: true,
+  padding: { left: 1, right: 1 },
+  label: " Add Bot ",
+  border: { type: "line" },
+  style: {
+    fg: "white",
+    bg: "#0f2e13",
+    border: { fg: "green" },
+    label: { fg: "green", bold: true },
+  },
+});
+
+screen.append(header);
+screen.append(botsBox);
+screen.append(logsBox);
+screen.append(inputBox);
+
+function currentPrompt() {
+  return waitingForPin ? "Kahoot PIN: " : "Bot name: ";
 }
 
-function renderPrompt() {
-  if (busy) {
+function setCursorVisible(visible) {
+  if (visible) {
+    screen.program.showCursor();
+  } else {
+    screen.program.hideCursor();
+  }
+}
+
+function render() {
+  screen.render();
+}
+
+function renderInput() {
+  const prompt = currentPrompt();
+
+  const chars = Array.from(inputBuffer);
+  const totalWidth = Math.max(1, (inputBox.width || 1) - 4);
+  const promptChars = Array.from(prompt).length;
+  const fieldWidth = Math.max(1, totalWidth - promptChars);
+
+  if (cursorIndex < inputScroll) {
+    inputScroll = cursorIndex;
+  }
+  if (cursorIndex > inputScroll + fieldWidth) {
+    inputScroll = cursorIndex - fieldWidth;
+  }
+
+  const visible = chars.slice(inputScroll, inputScroll + fieldWidth).join("");
+  inputBox.setContent(`${prompt}${visible}`);
+
+  screen.render();
+
+  const relativeCursor = Math.max(
+    0,
+    Math.min(fieldWidth, cursorIndex - inputScroll),
+  );
+  const row = inputBox.atop + 1;
+  const col = inputBox.aleft + 2 + promptChars + relativeCursor;
+  setCursorVisible(true);
+  screen.program.cup(row, col);
+}
+
+function setInputBuffer(value) {
+  inputBuffer = value;
+  cursorIndex = Array.from(value).length;
+  inputScroll = 0;
+}
+
+function insertChar(ch) {
+  const chars = Array.from(inputBuffer);
+  chars.splice(cursorIndex, 0, ch);
+  inputBuffer = chars.join("");
+  cursorIndex += 1;
+}
+
+function removeCharBeforeCursor() {
+  if (cursorIndex <= 0) {
     return;
   }
-  readline.clearLine(process.stdout, 0);
-  readline.cursorTo(process.stdout, 0);
-  process.stdout.write(`${promptText()}${inputBuffer}`);
+  const chars = Array.from(inputBuffer);
+  chars.splice(cursorIndex - 1, 1);
+  inputBuffer = chars.join("");
+  cursorIndex -= 1;
 }
 
-function printLine(message) {
-  readline.clearLine(process.stdout, 0);
-  readline.cursorTo(process.stdout, 0);
-  process.stdout.write(`${message}\n`);
-  renderPrompt();
-}
-
-function parsePin(value) {
-  const pin = Number.parseInt(value, 10);
-  if (!Number.isFinite(pin) || pin <= 0) {
-    return 0;
+function removeCharAtCursor() {
+  const chars = Array.from(inputBuffer);
+  if (cursorIndex >= chars.length) {
+    return;
   }
-  return pin;
+  chars.splice(cursorIndex, 1);
+  inputBuffer = chars.join("");
 }
 
 function formatError(err) {
@@ -64,6 +191,14 @@ function formatError(err) {
     return err;
   }
   return "unknown error";
+}
+
+function parsePin(value) {
+  const pin = Number.parseInt(value, 10);
+  if (!Number.isFinite(pin) || pin <= 0) {
+    return 0;
+  }
+  return pin;
 }
 
 function randomAnswer(question) {
@@ -91,13 +226,36 @@ function randomAnswer(question) {
   return Math.floor(Math.random() * 4);
 }
 
+function logStatus(symbol, color, text) {
+  logsBox.log(
+    `{${color}-fg}{bold}${symbol}{/bold}{/${color}-fg}  {white-fg}${text}{/white-fg}`,
+  );
+  logsBox.setScrollPerc(100);
+  renderInput();
+}
+
+function refreshBots() {
+  const names = Array.from(joinedBots).sort((a, b) => a.localeCompare(b));
+  if (names.length === 0) {
+    botsBox.setContent("(none)");
+  } else {
+    botsBox.setContent(names.map((name) => `- ${name}`).join("\n"));
+  }
+  renderInput();
+}
+
 async function addBot(name) {
-  if (clients.has(name)) {
-    printLine(status("!", C.cyan, `${name} bot already connected.`));
+  if (joinedBots.has(name)) {
+    logStatus("⚠", "yellow", `${name} bot already connected`);
+    return false;
+  }
+  if (pendingBots.has(name)) {
+    logStatus("⚠", "yellow", `${name} join already in progress`);
     return false;
   }
 
   const client = new Kahoot();
+  pendingBots.add(name);
   clients.set(name, client);
 
   client.on("QuestionStart", (question) => {
@@ -106,23 +264,30 @@ async function addBot(name) {
 
   client.on("Disconnect", (reason) => {
     clients.delete(name);
-    printLine(
-      status("!", C.gray, `${name} disconnected: ${reason || "unknown"}`),
-    );
+    joinedBots.delete(name);
+    pendingBots.delete(name);
+    refreshBots();
+    logStatus("⚠", "yellow", `${name} disconnected: ${reason || "unknown"}`);
   });
 
   try {
     await client.join(gamePin, name);
-    printLine(status("✓", C.green, `${name} connected.`));
+    pendingBots.delete(name);
+    joinedBots.add(name);
+    refreshBots();
+    logStatus("✓", "green", `${name} connected`);
     return true;
   } catch (err) {
     clients.delete(name);
+    joinedBots.delete(name);
+    pendingBots.delete(name);
+    refreshBots();
     const message = formatError(err);
     if (message.toLowerCase().includes("duplicate name")) {
-      printLine(status("⚠", C.purple, `${name} failed: duplicate bot name`));
+      logStatus("⚠", "magenta", `${name} failed: duplicate bot name`);
       return false;
     }
-    printLine(status("⚠", C.purple, `${name} failed: ${message}`));
+    logStatus("⚠", "magenta", `${name} failed: ${message}`);
     return false;
   }
 }
@@ -134,97 +299,119 @@ function closeAll() {
     } catch (_err) {}
   }
   clients.clear();
+  joinedBots.clear();
 }
 
-process.on("SIGINT", () => {
-  process.stdout.write("\n");
-  closeAll();
-  process.exit(0);
-});
-
-async function handleSubmit(value) {
-  const trimmed = value.trim();
-
-  if (!trimmed) {
+async function handleSubmit(raw) {
+  const value = raw.trim();
+  if (!value) {
+    renderInput();
     return;
   }
 
-  if (enteringPin) {
-    const pin = parsePin(trimmed);
+  if (waitingForPin) {
+    const pin = parsePin(value);
     if (!pin) {
-      printLine(status("⚠", C.purple, "PIN must be a number."));
+      logStatus("⚠", "magenta", "PIN must be a number");
+      renderInput();
       return;
     }
     gamePin = pin;
-    enteringPin = false;
-    printLine("Type bot names. Type exit to leave.");
+    waitingForPin = false;
+    logStatus("✓", "green", "Game pin accepted");
+    refreshBots();
+    renderInput();
     return;
   }
 
-  if (trimmed.toLowerCase() === "exit") {
+  if (value.toLowerCase() === "exit") {
     closeAll();
-    process.stdout.write("\n");
+    screen.destroy();
     process.exit(0);
   }
-  await addBot(trimmed);
+
+  addBot(value).catch((err) => {
+    logStatus("⚠", "magenta", `${value} failed: ${formatError(err)}`);
+  });
 }
 
-function onKeypress(str, key) {
-  if (key && key.ctrl && key.name === "c") {
-    process.kill(process.pid, "SIGINT");
+function submitCurrentInput() {
+  const value = inputBuffer;
+  setInputBuffer("");
+  renderInput();
+  handleSubmit(value).catch((err) => {
+    logStatus("⚠", "magenta", `Error: ${formatError(err)}`);
+    closeAll();
+    setCursorVisible(true);
+    screen.destroy();
+    process.exit(1);
+  });
+}
+
+process.on("SIGINT", () => {
+  closeAll();
+  setCursorVisible(true);
+  screen.destroy();
+  process.exit(0);
+});
+
+screen.key(["C-c"], () => {
+  closeAll();
+  setCursorVisible(true);
+  screen.destroy();
+  process.exit(0);
+});
+
+screen.on("keypress", (ch, key) => {
+  if (key && key.name === "enter") {
+    submitCurrentInput();
     return;
   }
-
-  if (busy) {
+  if (key && key.name === "left") {
+    cursorIndex = Math.max(0, cursorIndex - 1);
+    renderInput();
     return;
   }
-
-  if (key && key.name === "return") {
-    const submitted = inputBuffer;
-    const trimmed = submitted.trim();
-    inputBuffer = "";
-    const shouldLock =
-      !enteringPin && trimmed && trimmed.toLowerCase() !== "exit";
-    if (shouldLock) {
-      busy = true;
-    }
-    process.stdout.write("\n");
-    handleSubmit(submitted)
-      .then(() => {
-        if (shouldLock) {
-          busy = false;
-        }
-        renderPrompt();
-      })
-      .catch((err) => {
-        if (shouldLock) {
-          busy = false;
-        }
-        printLine(status("⚠", C.purple, `Error: ${formatError(err)}`));
-        closeAll();
-        process.exit(1);
-      });
+  if (key && key.name === "right") {
+    cursorIndex = Math.min(Array.from(inputBuffer).length, cursorIndex + 1);
+    renderInput();
     return;
   }
-
+  if (key && key.name === "home") {
+    cursorIndex = 0;
+    renderInput();
+    return;
+  }
+  if (key && key.name === "end") {
+    cursorIndex = Array.from(inputBuffer).length;
+    renderInput();
+    return;
+  }
   if (key && key.name === "backspace") {
-    if (inputBuffer.length > 0) {
-      inputBuffer = inputBuffer.slice(0, -1);
-      renderPrompt();
-    }
+    removeCharBeforeCursor();
+    renderInput();
+    return;
+  }
+  if (key && key.name === "delete") {
+    removeCharAtCursor();
+    renderInput();
     return;
   }
 
-  if (str && str >= " " && str !== "\u007f") {
-    inputBuffer += str;
-    renderPrompt();
+  if (key && key.ctrl) {
+    return;
   }
-}
 
-readline.emitKeypressEvents(process.stdin);
-if (process.stdin.isTTY && typeof process.stdin.setRawMode === "function") {
-  process.stdin.setRawMode(true);
-}
-process.stdin.on("keypress", onKeypress);
-process.stdin.resume();
-renderPrompt();
+  if (typeof ch === "string" && ch >= " " && ch !== "\u007f") {
+    insertChar(ch);
+    renderInput();
+  }
+});
+
+screen.on("resize", () => {
+  renderInput();
+});
+
+refreshBots();
+setInputBuffer("");
+renderInput();

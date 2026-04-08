@@ -7,6 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
+    "blessed": "^0.1.81",
     "kahoot.js-latest": "^1.0.8"
   }
 }
