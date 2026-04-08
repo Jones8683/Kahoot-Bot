@@ -1,6 +1,6 @@
 # Kahoot Bot
 
-Simple Kahoot bot launcher.
+https://github.com/Jones8683/Kahoot-Bot
 
 ## Setup
 
