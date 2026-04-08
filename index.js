@@ -14,7 +14,7 @@ let inputScroll = 0;
 
 const screen = blessed.screen({
   smartCSR: true,
-  title: "Kahoot Bot",
+  title: "Kahoot Bot Launcher",
   cursor: {
     artificial: false,
     shape: "line",
@@ -29,7 +29,7 @@ const header = blessed.box({
   height: 3,
   tags: true,
   padding: { left: 1, right: 1 },
-  content: "{bold}Kahoot Bot{/bold}\nAdd bot names Type exit to leave",
+  content: "{bold}Kahoot Bot Launcher{/bold}\nAdd bot names Type exit to leave",
   border: { type: "line" },
   style: {
     fg: "white",
@@ -112,10 +112,6 @@ function setCursorVisible(visible) {
   } else {
     screen.program.hideCursor();
   }
-}
-
-function render() {
-  screen.render();
 }
 
 function renderInput() {
@@ -300,6 +296,7 @@ function closeAll() {
   }
   clients.clear();
   joinedBots.clear();
+  pendingBots.clear();
 }
 
 async function handleSubmit(raw) {

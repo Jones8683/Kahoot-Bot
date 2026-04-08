@@ -1,4 +1,4 @@
-# Kahoot Bot
+# Kahoot Bot Launcher
 
 ### Setup
 

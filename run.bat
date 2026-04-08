@@ -31,11 +31,7 @@ if not exist "node_modules\kahoot.js-latest" (
     )
 )
 
-echo.
-echo %PURPLE%=========================================%RESET%
-echo %PURPLE%          Kahoot Bot Launcher%RESET%
-echo %PURPLE%=========================================%RESET%
-echo.
+cls
 node index.js
 pause
 exit /b %errorlevel%
