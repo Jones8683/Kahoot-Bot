@@ -1,0 +1,12 @@
+{
+  "name": "kahoot-bot",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "kahoot.js-latest": "^1.0.8"
+  }
+}
