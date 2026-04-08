@@ -25,7 +25,7 @@ Flow:
 4. You will see a success or failure line for each name.
 5. Keep adding players as long as you want.
 
-## Run From Terminal
+### Run From Terminal
 
 ```bash
 node index.js
