@@ -166,10 +166,7 @@ async function handleSubmit(value) {
     process.stdout.write("\n");
     process.exit(0);
   }
-
-  busy = true;
   await addBot(trimmed);
-  busy = false;
 }
 
 function onKeypress(str, key) {
@@ -184,13 +181,25 @@ function onKeypress(str, key) {
 
   if (key && key.name === "return") {
     const submitted = inputBuffer;
+    const trimmed = submitted.trim();
     inputBuffer = "";
+    const shouldLock =
+      !enteringPin && trimmed && trimmed.toLowerCase() !== "exit";
+    if (shouldLock) {
+      busy = true;
+    }
     process.stdout.write("\n");
     handleSubmit(submitted)
       .then(() => {
+        if (shouldLock) {
+          busy = false;
+        }
         renderPrompt();
       })
       .catch((err) => {
+        if (shouldLock) {
+          busy = false;
+        }
         printLine(status("⚠", C.purple, `Error: ${formatError(err)}`));
         closeAll();
         process.exit(1);
