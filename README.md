@@ -1,7 +1,5 @@
 # Kahoot Bot
 
-https://github.com/Jones8683/Kahoot-Bot
-
 ## Setup
 
 &nbsp;&nbsp;&nbsp; **1. Clone repository**
