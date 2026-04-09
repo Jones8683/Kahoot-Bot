@@ -10,6 +10,7 @@ const HEADER_COLOR = "magenta";
 const bots = new Map();
 const joining = new Set();
 const pendingKick = new Set();
+const mutedDisconnect = new Set();
 
 let gamePin = 0;
 let waitingForPin = true;
@@ -294,6 +295,9 @@ async function connectBot(name) {
       bots.delete(cleanName);
       refreshBots();
     }
+    if (mutedDisconnect.delete(cleanName)) {
+      return;
+    }
     const msg = reason || "unknown";
     logStatus("warn", `${cleanName} disconnected: ${msg}`);
   });
@@ -304,6 +308,7 @@ async function connectBot(name) {
 
     if (pendingKick.has(cleanName)) {
       pendingKick.delete(cleanName);
+      mutedDisconnect.add(cleanName);
       try {
         client.leave(true);
       } catch (_err) {}
@@ -428,6 +433,7 @@ async function kickBot(name) {
 
   bots.delete(cleanName);
   refreshBots();
+  mutedDisconnect.add(cleanName);
 
   try {
     client.leave(true);
