@@ -38,3 +38,6 @@ Double-click `run.bat`
 ```bash
 node index.js
 ```
+
+<img width="1920" height="960" alt="Mockup 2" src="https://github.com/user-attachments/assets/2b094361-e7b6-4e08-9b08-f642f3c619cb" />
+
