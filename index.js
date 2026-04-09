@@ -263,9 +263,7 @@ function logStatus(level, text) {
 }
 
 function refreshBots() {
-  const names = Array.from(bots.keys()).sort((a, b) =>
-    a.localeCompare(b, undefined, { sensitivity: "base" }),
-  );
+  const names = Array.from(bots.keys()).reverse();
 
   const count = names.length;
   botsBox.setLabel(
@@ -614,9 +612,7 @@ async function handleCommand(text) {
   }
 
   if (/^list$/i.test(clean)) {
-    const names = Array.from(bots.keys()).sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: "base" }),
-    );
+    const names = Array.from(bots.keys()).reverse();
     if (names.length === 0) {
       logStatus("info", "No active bots");
       return;
