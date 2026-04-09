@@ -3,18 +3,24 @@
 const blessed = require("blessed");
 const Kahoot = require("kahoot.js-latest");
 
-const clients = new Map();
-const joinedBots = new Set();
-const pendingBots = new Set();
+const MAX_BATCH_SIZE = 200;
+const DEFAULT_PARALLEL_JOINS = 10;
+const HEADER_COLOR = "magenta";
+
+const bots = new Map();
+const joining = new Set();
+const pendingKick = new Set();
+
 let gamePin = 0;
 let waitingForPin = true;
 let inputBuffer = "";
 let cursorIndex = 0;
 let inputScroll = 0;
+let shuttingDown = false;
 
 const screen = blessed.screen({
   smartCSR: true,
-  title: "Kahoot Bot Launcher",
+  title: "Kahoot Bot Manager",
   cursor: {
     artificial: false,
     shape: "line",
@@ -29,31 +35,33 @@ const header = blessed.box({
   height: 3,
   tags: true,
   padding: { left: 1, right: 1 },
-  content: "{bold}Kahoot Bot Launcher{/bold}\nAdd bot names Type exit to leave",
+  content: `{${HEADER_COLOR}-fg}{bold}Kahoot Bot Manager{/bold}{/${HEADER_COLOR}-fg}\nType help for commands`,
   border: { type: "line" },
   style: {
     fg: "white",
-    bg: "#240a3d",
-    border: { fg: "magenta" },
-    label: { fg: "magenta", bold: true },
+    bg: "#1f1230",
+    border: { fg: HEADER_COLOR },
+    label: { fg: HEADER_COLOR, bold: true },
   },
 });
 
 const botsBox = blessed.box({
   top: 3,
   left: 0,
-  width: "40%",
+  width: "45%",
   bottom: 3,
   tags: true,
   padding: { left: 1, right: 1 },
-  label: " Joined Bots ",
+  label: " Active Bots ",
   border: { type: "line" },
   content: "(none)",
   scrollable: true,
   alwaysScroll: true,
+  mouse: true,
+  scrollbar: { bg: "gray" },
   style: {
     fg: "white",
-    bg: "#3a320f",
+    bg: "#2d2a10",
     border: { fg: "yellow" },
     label: { fg: "yellow", bold: true },
   },
@@ -61,8 +69,8 @@ const botsBox = blessed.box({
 
 const logsBox = blessed.log({
   top: 3,
-  left: "40%",
-  width: "60%",
+  left: "45%",
+  width: "55%",
   bottom: 3,
   tags: true,
   padding: { left: 1, right: 1 },
@@ -74,7 +82,7 @@ const logsBox = blessed.log({
   scrollbar: { bg: "gray" },
   style: {
     fg: "white",
-    bg: "#4a3f10",
+    bg: "#3d3410",
     border: { fg: "yellow" },
     label: { fg: "yellow", bold: true },
   },
@@ -87,7 +95,7 @@ const inputBox = blessed.box({
   height: 3,
   tags: true,
   padding: { left: 1, right: 1 },
-  label: " Add Bot ",
+  label: " Input ",
   border: { type: "line" },
   style: {
     fg: "white",
@@ -103,7 +111,7 @@ screen.append(logsBox);
 screen.append(inputBox);
 
 function currentPrompt() {
-  return waitingForPin ? "Kahoot PIN: " : "Bot name: ";
+  return waitingForPin ? "PIN> " : "CMD> ";
 }
 
 function setCursorVisible(visible) {
@@ -116,7 +124,6 @@ function setCursorVisible(visible) {
 
 function renderInput() {
   const prompt = currentPrompt();
-
   const chars = Array.from(inputBuffer);
   const totalWidth = Math.max(1, (inputBox.width || 1) - 4);
   const promptChars = Array.from(prompt).length;
@@ -178,10 +185,10 @@ function removeCharAtCursor() {
 
 function formatError(err) {
   if (err && err.description) {
-    return err.description;
+    return String(err.description);
   }
   if (err && err.message) {
-    return err.message;
+    return String(err.message);
   }
   if (typeof err === "string") {
     return err;
@@ -222,141 +229,384 @@ function randomAnswer(question) {
   return Math.floor(Math.random() * 4);
 }
 
-function logStatus(symbol, color, text) {
+function logStatus(level, text) {
+  const palette = {
+    info: { symbol: "[i]", color: "cyan" },
+    ok: { symbol: "[+]", color: "green" },
+    warn: { symbol: "[!]", color: "yellow" },
+    err: { symbol: "[x]", color: "red" },
+  };
+  const entry = palette[level] || palette.info;
+
   logsBox.log(
-    `{${color}-fg}{bold}${symbol}{/bold}{/${color}-fg}  {white-fg}${text}{/white-fg}`,
+    `{${entry.color}-fg}{bold}${entry.symbol}{/bold}{/${entry.color}-fg}  {white-fg}${text}{/white-fg}`,
   );
   logsBox.setScrollPerc(100);
   renderInput();
 }
 
 function refreshBots() {
-  const names = Array.from(joinedBots).sort((a, b) => a.localeCompare(b));
+  const names = Array.from(bots.keys()).sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" }),
+  );
+
   if (names.length === 0) {
     botsBox.setContent("(none)");
-  } else {
-    botsBox.setContent(names.map((name) => `- ${name}`).join("\n"));
+    renderInput();
+    return;
   }
+
+  botsBox.setContent(names.join("\n"));
   renderInput();
 }
 
-async function addBot(name) {
-  if (joinedBots.has(name)) {
-    logStatus("⚠", "yellow", `${name} bot already connected`);
+function hasBot(name) {
+  const key = String(name || "").trim();
+  if (!key) {
     return false;
   }
-  if (pendingBots.has(name)) {
-    logStatus("⚠", "yellow", `${name} join already in progress`);
-    return false;
+  return bots.has(key) || joining.has(key);
+}
+
+async function connectBot(name) {
+  const cleanName = String(name || "").trim();
+  if (!cleanName) {
+    return "skipped";
   }
 
+  if (hasBot(cleanName)) {
+    logStatus("warn", `${cleanName} already exists`);
+    return "skipped";
+  }
+
+  joining.add(cleanName);
+
   const client = new Kahoot();
-  pendingBots.add(name);
-  clients.set(name, client);
 
   client.on("QuestionStart", (question) => {
     client.answer(randomAnswer(question)).catch(() => {});
   });
 
   client.on("Disconnect", (reason) => {
-    clients.delete(name);
-    joinedBots.delete(name);
-    pendingBots.delete(name);
-    refreshBots();
-    logStatus("⚠", "yellow", `${name} disconnected: ${reason || "unknown"}`);
+    joining.delete(cleanName);
+    const existing = bots.get(cleanName);
+    if (existing === client) {
+      bots.delete(cleanName);
+      refreshBots();
+    }
+    const msg = reason || "unknown";
+    logStatus("warn", `${cleanName} disconnected: ${msg}`);
   });
 
   try {
-    await client.join(gamePin, name);
-    pendingBots.delete(name);
-    joinedBots.add(name);
-    refreshBots();
-    logStatus("✓", "green", `${name} connected`);
-    return true;
-  } catch (err) {
-    clients.delete(name);
-    joinedBots.delete(name);
-    pendingBots.delete(name);
-    refreshBots();
-    const message = formatError(err);
-    if (message.toLowerCase().includes("duplicate name")) {
-      logStatus("⚠", "magenta", `${name} failed: duplicate bot name`);
-      return false;
+    await client.join(gamePin, cleanName);
+    joining.delete(cleanName);
+
+    if (pendingKick.has(cleanName)) {
+      pendingKick.delete(cleanName);
+      try {
+        client.leave(true);
+      } catch (_err) {}
+      logStatus("info", `${cleanName} removed`);
+      return "skipped";
     }
-    logStatus("⚠", "magenta", `${name} failed: ${message}`);
+
+    bots.set(cleanName, client);
+    refreshBots();
+    logStatus("ok", `${cleanName} connected`);
+    return "connected";
+  } catch (err) {
+    joining.delete(cleanName);
+    pendingKick.delete(cleanName);
+    logStatus("err", `${cleanName} failed: ${formatError(err)}`);
+    return "failed";
+  }
+}
+
+function uniqueNames(names) {
+  const seen = new Set();
+  const output = [];
+
+  for (const name of names) {
+    const cleanName = String(name || "").trim();
+    if (!cleanName) {
+      continue;
+    }
+
+    const key = cleanName.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    output.push(cleanName);
+  }
+
+  return output;
+}
+
+function parseNameExpression(raw) {
+  const text = String(raw || "").trim();
+  if (!text) {
+    return { names: [], error: "name is required" };
+  }
+
+  const starPattern = text.match(/^(.*?)\s*\*\s*(\d+)$/);
+  if (starPattern) {
+    const base = starPattern[1].trim();
+    const count = Number.parseInt(starPattern[2], 10);
+
+    if (!base) {
+      return { names: [], error: "base name cannot be empty" };
+    }
+    if (!Number.isFinite(count) || count <= 0) {
+      return { names: [], error: "pattern count must be a positive number" };
+    }
+    if (count > MAX_BATCH_SIZE) {
+      return {
+        names: [],
+        error: `pattern count too large (max ${MAX_BATCH_SIZE})`,
+      };
+    }
+
+    const names = [];
+    for (let i = 0; i < count; i += 1) {
+      names.push(`${base}${i + 1}`);
+    }
+
+    return { names, error: "" };
+  }
+
+  return { names: [text], error: "" };
+}
+
+async function addMany(names, parallelLimit) {
+  const cleanNames = uniqueNames(names);
+  if (cleanNames.length === 0) {
+    logStatus("warn", "No valid names");
+    return;
+  }
+
+  const workers = Math.max(1, Math.min(parallelLimit, cleanNames.length));
+  let index = 0;
+
+  async function runWorker() {
+    while (index < cleanNames.length) {
+      const current = cleanNames[index];
+      index += 1;
+      await connectBot(current);
+    }
+  }
+
+  const tasks = [];
+  for (let i = 0; i < workers; i += 1) {
+    tasks.push(runWorker());
+  }
+
+  await Promise.all(tasks);
+}
+
+async function kickBot(name) {
+  const cleanName = String(name || "").trim();
+  if (!cleanName) {
+    logStatus("warn", "kick requires a bot name");
     return false;
   }
-}
 
-function closeAll() {
-  for (const client of clients.values()) {
-    try {
-      client.leave(true);
-    } catch (_err) {}
+  if (joining.has(cleanName)) {
+    joining.delete(cleanName);
+    pendingKick.add(cleanName);
+    logStatus("info", `${cleanName} removed`);
+    return true;
   }
-  clients.clear();
-  joinedBots.clear();
-  pendingBots.clear();
+
+  const client = bots.get(cleanName);
+  if (!client) {
+    logStatus("warn", `${cleanName} not found`);
+    return false;
+  }
+
+  bots.delete(cleanName);
+  refreshBots();
+
+  try {
+    client.leave(true);
+  } catch (_err) {}
+
+  logStatus("info", `${cleanName} removed`);
+  return true;
 }
 
-async function handleSubmit(raw) {
-  const value = raw.trim();
-  if (!value) {
+async function kickAll() {
+  const names = Array.from(bots.keys());
+  for (const name of names) {
+    await kickBot(name);
+  }
+
+  const joiningNames = Array.from(joining.values());
+  for (const name of joiningNames) {
+    await kickBot(name);
+  }
+}
+
+function showHelp() {
+  logStatus("info", "Command syntax:");
+  logStatus("info", "  pin <pin>");
+  logStatus("info", "  add <name>");
+  logStatus("info", "  add <base>*<count>");
+  logStatus("info", "  kick <name>");
+  logStatus("info", "  kick all");
+  logStatus("info", "  list");
+  logStatus("info", "  clear");
+  logStatus("info", "  help");
+  logStatus("info", "  exit");
+}
+
+function parsePinFromCommand(text) {
+  const clean = text.trim();
+  const pinCommand = clean.match(/^pin\s+(\d+)$/i);
+  if (pinCommand) {
+    return parsePin(pinCommand[1]);
+  }
+  if (/^\d+$/.test(clean)) {
+    return parsePin(clean);
+  }
+  return 0;
+}
+
+async function executeAdd(text) {
+  const expression = text.replace(/^add\s+/i, "").trim();
+  const parsed = parseNameExpression(expression);
+
+  if (parsed.error) {
+    logStatus("err", parsed.error);
+    return;
+  }
+
+  await addMany(parsed.names, DEFAULT_PARALLEL_JOINS);
+}
+
+async function handleCommand(text) {
+  const clean = text.trim();
+  if (!clean) {
     renderInput();
+    return;
+  }
+
+  if (/^(exit|quit)$/i.test(clean)) {
+    await shutdown(0);
+    return;
+  }
+
+  if (/^help$/i.test(clean)) {
+    showHelp();
     return;
   }
 
   if (waitingForPin) {
-    const pin = parsePin(value);
+    const pin = parsePinFromCommand(clean);
     if (!pin) {
-      logStatus("⚠", "magenta", "PIN must be a number");
-      renderInput();
+      logStatus("err", "Enter a numeric PIN first");
       return;
     }
+
     gamePin = pin;
     waitingForPin = false;
-    logStatus("✓", "green", "Game pin accepted");
-    refreshBots();
-    renderInput();
+    logStatus("ok", `PIN set to ${gamePin}`);
     return;
   }
 
-  if (value.toLowerCase() === "exit") {
-    closeAll();
-    screen.destroy();
-    process.exit(0);
+  if (/^pin\s+\d+$/i.test(clean)) {
+    const nextPin = parsePinFromCommand(clean);
+    if (!nextPin) {
+      logStatus("err", "Invalid PIN");
+      return;
+    }
+
+    if (nextPin !== gamePin) {
+      await kickAll();
+      gamePin = nextPin;
+      logStatus("ok", `PIN set to ${gamePin}`);
+    } else {
+      logStatus("info", `PIN already ${gamePin}`);
+    }
+    return;
   }
 
-  addBot(value).catch((err) => {
-    logStatus("⚠", "magenta", `${value} failed: ${formatError(err)}`);
-  });
+  if (/^clear$/i.test(clean)) {
+    logsBox.setContent("");
+    logStatus("info", "Log cleared");
+    return;
+  }
+
+  if (/^list$/i.test(clean)) {
+    const names = Array.from(bots.keys()).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
+    );
+    if (names.length === 0) {
+      logStatus("info", "No active bots");
+      return;
+    }
+    logStatus("info", `Active: ${names.join(", ")}`);
+    return;
+  }
+
+  if (/^kick\s+all$/i.test(clean)) {
+    await kickAll();
+    logStatus("info", "All bots removed");
+    return;
+  }
+
+  const kickMatch = clean.match(/^kick\s+(.+)$/i);
+  if (kickMatch) {
+    await kickBot(kickMatch[1]);
+    return;
+  }
+
+  if (/^add\s+/i.test(clean)) {
+    await executeAdd(clean);
+    return;
+  }
+
+  logStatus("err", "Unknown command. Run help to list commands");
 }
 
 function submitCurrentInput() {
   const value = inputBuffer;
   setInputBuffer("");
   renderInput();
-  handleSubmit(value).catch((err) => {
-    logStatus("⚠", "magenta", `Error: ${formatError(err)}`);
-    closeAll();
-    setCursorVisible(true);
-    screen.destroy();
-    process.exit(1);
+
+  handleCommand(value).catch(async (err) => {
+    logStatus("err", `Fatal error: ${formatError(err)}`);
+    await shutdown(1);
   });
 }
 
-process.on("SIGINT", () => {
-  closeAll();
+async function shutdown(exitCode) {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+
+  try {
+    await kickAll();
+  } catch (_err) {}
+
   setCursorVisible(true);
   screen.destroy();
-  process.exit(0);
+  process.exit(exitCode);
+}
+
+process.on("SIGINT", () => {
+  shutdown(0).catch(() => {
+    process.exit(0);
+  });
 });
 
 screen.key(["C-c"], () => {
-  closeAll();
-  setCursorVisible(true);
-  screen.destroy();
-  process.exit(0);
+  shutdown(0).catch(() => {
+    process.exit(0);
+  });
 });
 
 screen.on("keypress", (ch, key) => {
@@ -412,3 +662,5 @@ screen.on("resize", () => {
 refreshBots();
 setInputBuffer("");
 renderInput();
+logStatus("info", "Enter PIN to start");
+logStatus("info", "Run help to list commands");

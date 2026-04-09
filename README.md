@@ -1,4 +1,4 @@
-# Kahoot Bot Launcher
+# Kahoot Bot Manager
 
 ### Setup
 
@@ -20,12 +20,25 @@ Double-click `run.bat`
 
 Flow:
 
-1. Enter the Kahoot game pin.
-2. Type bot names in the `Bot name` input. Type `exit` to leave.
-3. You can move the cursor with arrow keys and edit with Backspace/Delete.
-4. You will see a success or failure line for each bot.
-5. Duplicate handling shows warnings like `bot already connected`, `join already in progress`, or `duplicate bot name`.
-6. Keep adding bots as long as you want.
+1. Enter the game pin with `pin <pin>` or just type the pin number first.
+2. Add bots with one simple syntax style.
+3. Remove bots with `kick <name>` or `kick all`.
+4. Type `help` anytime for syntax.
+5. Type `exit` to quit.
+
+### Command Syntax
+
+```text
+pin <pin>
+add <name>
+add <base>*<count>
+kick <name>
+kick all
+list
+clear
+help
+exit
+```
 
 ### Run From Terminal
 

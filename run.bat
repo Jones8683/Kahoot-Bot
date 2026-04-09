@@ -1,11 +1,8 @@
 @echo off
 setlocal EnableDelayedExpansion
-title Kahoot Bot Launcher
+title Kahoot Bot Manager
 cd /d "%~dp0"
 
-for /f %%a in ('echo prompt $E^| cmd') do set "ESC=%%a"
-set "PURPLE=%ESC%[95m"
-set "RESET=%ESC%[0m"
 set "NODE_TLS_REJECT_UNAUTHORIZED="
 set "FORCE_COLOR=1"
 if defined NODE_OPTIONS (
