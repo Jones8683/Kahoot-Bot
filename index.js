@@ -4,7 +4,7 @@ const blessed = require("blessed");
 const Kahoot = require("kahoot.js-latest");
 
 const MAX_BATCH_SIZE = 2000;
-const DEFAULT_PARALLEL_JOINS = 39;
+const DEFAULT_PARALLEL_JOINS = 35;
 const HEADER_COLOR = "magenta";
 
 const bots = new Map();
