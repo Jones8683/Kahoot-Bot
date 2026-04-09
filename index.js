@@ -35,10 +35,10 @@ const header = blessed.box({
   height: 3,
   tags: true,
   padding: { left: 1, right: 1 },
-  content: `{${HEADER_COLOR}-fg}{bold}Kahoot Bot Manager{/bold}{/${HEADER_COLOR}-fg}\nType help for commands`,
+  content: "{bold}Kahoot Bot Manager{/bold}\nType help for commands",
   border: { type: "line" },
   style: {
-    fg: "white",
+    fg: HEADER_COLOR,
     bg: "#1f1230",
     border: { fg: HEADER_COLOR },
     label: { fg: HEADER_COLOR, bold: true },
