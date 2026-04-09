@@ -39,4 +39,4 @@ Double-click `run.bat`
 node index.js
 ```
 
-<img width="1920" height="960" alt="Mockup" src="https://github.com/user-attachments/assets/65498a4d-2141-4e5f-89c1-d0c9bde3dadb" />
+<img width="1920" height="960" alt="Mockup" src="https://github.com/user-attachments/assets/035d66d6-7a64-41f5-8c80-f703fa90f096" />
