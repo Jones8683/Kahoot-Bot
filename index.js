@@ -7,6 +7,19 @@ const MAX_BATCH_SIZE = 2000;
 const DEFAULT_PARALLEL_JOINS = 35;
 const HEADER_COLOR = "magenta";
 
+const INVIS = ["\u200B", "\u200C", "\u200D", "\u2060"];
+
+function invisibleSuffix(index) {
+  if (index === 0) return "";
+  let result = "";
+  let n = index;
+  while (n > 0) {
+    result += INVIS[(n - 1) % INVIS.length];
+    n = Math.floor((n - 1) / INVIS.length);
+  }
+  return result;
+}
+
 const bots = new Map();
 const joining = new Set();
 const pendingKick = new Set();
@@ -254,6 +267,13 @@ function refreshBots() {
     a.localeCompare(b, undefined, { sensitivity: "base" }),
   );
 
+  const count = names.length;
+  botsBox.setLabel(
+    count > 0
+      ? ` Active Bots {yellow-fg}(${count}){/yellow-fg} `
+      : " Active Bots ",
+  );
+
   if (names.length === 0) {
     botsBox.setContent("(none)");
     renderInput();
@@ -385,6 +405,32 @@ function parseNameExpression(raw) {
     return { names, error: "" };
   }
 
+  const clonePattern = text.match(/^(.*?)\s*~\s*(\d+)$/);
+  if (clonePattern) {
+    const base = clonePattern[1].trim();
+    const count = Number.parseInt(clonePattern[2], 10);
+
+    if (!base) {
+      return { names: [], error: "base name cannot be empty" };
+    }
+    if (!Number.isFinite(count) || count <= 0) {
+      return { names: [], error: "clone count must be a positive number" };
+    }
+    if (count > MAX_BATCH_SIZE) {
+      return {
+        names: [],
+        error: `clone count too large (max ${MAX_BATCH_SIZE})`,
+      };
+    }
+
+    const names = [];
+    for (let i = 0; i < count; i += 1) {
+      names.push(`${base}${invisibleSuffix(i)}`);
+    }
+
+    return { names, error: "" };
+  }
+
   return { names: [text], error: "" };
 }
 
@@ -481,6 +527,7 @@ function showHelp() {
   logStatus("info", "  pin <pin>");
   logStatus("info", "  add <name>");
   logStatus("info", "  add <base>*<count>");
+  logStatus("info", "  add <base>~<count>");
   logStatus("info", "  kick <name>");
   logStatus("info", "  kick all");
   logStatus("info", "  list");
