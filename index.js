@@ -18,6 +18,9 @@ let inputBuffer = "";
 let cursorIndex = 0;
 let inputScroll = 0;
 let shuttingDown = false;
+const commandHistory = [];
+let historyIndex = -1;
+let historySavedInput = "";
 
 const screen = blessed.screen({
   smartCSR: true,
@@ -444,15 +447,33 @@ async function kickBot(name) {
 }
 
 async function kickAll() {
-  const names = Array.from(bots.keys());
+  const names = [...Array.from(bots.keys()), ...Array.from(joining.values())];
+
   for (const name of names) {
-    await kickBot(name);
+    const cleanName = String(name || "").trim();
+    if (!cleanName) {
+      continue;
+    }
+
+    if (joining.has(cleanName)) {
+      joining.delete(cleanName);
+      pendingKick.add(cleanName);
+      continue;
+    }
+
+    const client = bots.get(cleanName);
+    if (!client) {
+      continue;
+    }
+
+    bots.delete(cleanName);
+    mutedDisconnect.add(cleanName);
+    try {
+      client.leave(true);
+    } catch (_err) {}
   }
 
-  const joiningNames = Array.from(joining.values());
-  for (const name of joiningNames) {
-    await kickBot(name);
-  }
+  refreshBots();
 }
 
 function showHelp() {
@@ -580,6 +601,16 @@ async function handleCommand(text) {
 function submitCurrentInput() {
   const value = inputBuffer;
   setInputBuffer("");
+
+  if (value.trim()) {
+    commandHistory.unshift(value);
+    if (commandHistory.length > 100) {
+      commandHistory.pop();
+    }
+  }
+  historyIndex = -1;
+  historySavedInput = "";
+
   renderInput();
 
   handleCommand(value).catch(async (err) => {
@@ -602,6 +633,20 @@ async function shutdown(exitCode) {
   screen.destroy();
   process.exit(exitCode);
 }
+
+process.on("uncaughtException", (err) => {
+  logStatus("err", `Uncaught error: ${formatError(err)}`);
+  shutdown(1).catch(() => {
+    process.exit(1);
+  });
+});
+
+process.on("unhandledRejection", (reason) => {
+  logStatus("err", `Unhandled rejection: ${formatError(reason)}`);
+  shutdown(1).catch(() => {
+    process.exit(1);
+  });
+});
 
 process.on("SIGHUP", () => {
   shutdown(0).catch(() => {
@@ -630,6 +675,29 @@ screen.key(["C-c"], () => {
 screen.on("keypress", (ch, key) => {
   if (key && key.name === "enter") {
     submitCurrentInput();
+    return;
+  }
+  if (key && key.name === "up") {
+    if (commandHistory.length === 0) {
+      return;
+    }
+    if (historyIndex === -1) {
+      historySavedInput = inputBuffer;
+    }
+    historyIndex = Math.min(historyIndex + 1, commandHistory.length - 1);
+    setInputBuffer(commandHistory[historyIndex]);
+    renderInput();
+    return;
+  }
+  if (key && key.name === "down") {
+    if (historyIndex === -1) {
+      return;
+    }
+    historyIndex -= 1;
+    setInputBuffer(
+      historyIndex === -1 ? historySavedInput : commandHistory[historyIndex],
+    );
+    renderInput();
     return;
   }
   if (key && key.name === "left") {
