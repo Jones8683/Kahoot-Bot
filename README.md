@@ -20,19 +20,20 @@ Double-click `run.bat`
 4. Type `help` anytime to list commands.
 5. Type `exit` to quit.
 
-### Command Syntax
-```
-pin <pin>
-add <name>
-add <base>*<count>
-add <base>~<count>
-kick <name>
-kick all
-list
-clear
-help
-exit
-```
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `pin <pin>` | Set the game PIN to connect to the Kahoot quiz |
+| `add <name>` | Add a single bot to the game |
+| `add <base>*<count>` | Add multiple bots with sequential names |
+| `add <base>~<count>` | Add multiple bots with exact duplicate names |
+| `kick <name>` | Remove a specific bot from the game |
+| `kick all` | Remove all bots at once |
+| `list` | Display all active bots |
+| `clear` | Clear the screen |
+| `help` | Show available commands |
+| `exit` | Quit the program |
 
 ### Run From Terminal
 ```bash
