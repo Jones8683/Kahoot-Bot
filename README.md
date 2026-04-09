@@ -1,4 +1,4 @@
-# Kahoot Bot Manager
+# Kahoot Bot
 
 ### Setup
 1. Clone the repository
@@ -16,9 +16,8 @@ Double-click `run.bat`
 ### Flow
 1. Enter the game PIN with `pin <pin>` or just type the number directly.
 2. Add bots using any of the syntax styles below.
-3. Remove bots with `kick <name>` or `kick all`.
-4. Type `help` anytime to list commands.
-5. Type `exit` to quit.
+3. Type `help` anytime to list commands.
+4. Type `exit` to quit.
 
 ### Commands
 
