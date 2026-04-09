@@ -36,7 +36,7 @@ const header = blessed.box({
   height: 3,
   tags: true,
   padding: { left: 1, right: 1 },
-  content: `{${HEADER_COLOR}-fg}{bold}Kahoot Bot Manager{/bold}{/${HEADER_COLOR}-fg}\n{gray-fg}Type {white-fg}help{/white-fg} for commands{/gray-fg}`,
+  content: "{bold}Kahoot Bot Manager{/bold}\nType help for commands",
   border: { type: "line" },
   style: {
     fg: HEADER_COLOR,
@@ -251,15 +251,8 @@ function refreshBots() {
     a.localeCompare(b, undefined, { sensitivity: "base" }),
   );
 
-  const count = names.length;
-  botsBox.setLabel(
-    count > 0
-      ? ` Active Bots {yellow-fg}(${count}){/yellow-fg} `
-      : " Active Bots ",
-  );
-
-  if (count === 0) {
-    botsBox.setContent("{gray-fg}(none){/gray-fg}");
+  if (names.length === 0) {
+    botsBox.setContent("(none)");
     renderInput();
     return;
   }
@@ -610,6 +603,18 @@ async function shutdown(exitCode) {
   process.exit(exitCode);
 }
 
+process.on("SIGHUP", () => {
+  shutdown(0).catch(() => {
+    process.exit(0);
+  });
+});
+
+process.on("SIGTERM", () => {
+  shutdown(0).catch(() => {
+    process.exit(0);
+  });
+});
+
 process.on("SIGINT", () => {
   shutdown(0).catch(() => {
     process.exit(0);
@@ -675,5 +680,5 @@ screen.on("resize", () => {
 refreshBots();
 setInputBuffer("");
 renderInput();
-logStatus("info", "Enter a game {white-fg}PIN{/white-fg} to start");
-logStatus("info", "Run {white-fg}help{/white-fg} to list commands");
+logStatus("info", "Enter PIN to start");
+logStatus("info", "Run help to list commands");
