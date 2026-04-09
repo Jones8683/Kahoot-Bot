@@ -36,7 +36,7 @@ const header = blessed.box({
   height: 3,
   tags: true,
   padding: { left: 1, right: 1 },
-  content: "{bold}Kahoot Bot Manager{/bold}\nType help for commands",
+  content: `{${HEADER_COLOR}-fg}{bold}Kahoot Bot Manager{/bold}{/${HEADER_COLOR}-fg}\n{gray-fg}Type {white-fg}help{/white-fg} for commands{/gray-fg}`,
   border: { type: "line" },
   style: {
     fg: HEADER_COLOR,
@@ -251,8 +251,15 @@ function refreshBots() {
     a.localeCompare(b, undefined, { sensitivity: "base" }),
   );
 
-  if (names.length === 0) {
-    botsBox.setContent("(none)");
+  const count = names.length;
+  botsBox.setLabel(
+    count > 0
+      ? ` Active Bots {yellow-fg}(${count}){/yellow-fg} `
+      : " Active Bots ",
+  );
+
+  if (count === 0) {
+    botsBox.setContent("{gray-fg}(none){/gray-fg}");
     renderInput();
     return;
   }
@@ -668,5 +675,5 @@ screen.on("resize", () => {
 refreshBots();
 setInputBuffer("");
 renderInput();
-logStatus("info", "Enter PIN to start");
-logStatus("info", "Run help to list commands");
+logStatus("info", "Enter a game {white-fg}PIN{/white-fg} to start");
+logStatus("info", "Run {white-fg}help{/white-fg} to list commands");
