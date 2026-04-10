@@ -3,7 +3,7 @@
 const blessed = require("blessed");
 const Kahoot = require("kahoot.js-latest");
 
-const MAX_BATCH_SIZE = 2000;
+const MAX_BATCH_SIZE = 9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999;
 const DEFAULT_PARALLEL_JOINS = 35;
 const HEADER_COLOR = "magenta";
 
