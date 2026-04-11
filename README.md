@@ -18,6 +18,11 @@ npm install
 ### Run
 Double-click `run.bat`
 
+### Run From Terminal
+```bash
+node index.js
+```
+
 ### Commands
 
 | Command | Description |
@@ -32,10 +37,5 @@ Double-click `run.bat`
 | `clear` | Clear the screen |
 | `help` | Show available commands |
 | `exit` | Quit the program |
-
-### Run From Terminal
-```bash
-node index.js
-```
 
 <img width="1920" height="960" alt="Mockup" src="https://github.com/user-attachments/assets/035d66d6-7a64-41f5-8c80-f703fa90f096" />
