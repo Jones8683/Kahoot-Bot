@@ -1,6 +1,6 @@
 # Kahoot Bot
 ### Features:
-- Flood Kahoots with customisable bots
+- Flood Kahoots with bots named whatever you want
 - Join multiple bots with the exact same name
 - Manage different bots individually
 - Instant random answers
