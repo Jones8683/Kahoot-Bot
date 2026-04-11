@@ -1,4 +1,9 @@
 # Kahoot Bot
+### Features:
+- Flood Kahoots with customisable bots
+- Join multiple bots with the exact same name
+- Manage different bots individually
+- Instant random answers
 
 ### Setup
 1. Clone the repository
@@ -12,12 +17,6 @@ npm install
 
 ### Run
 Double-click `run.bat`
-
-### Flow
-1. Enter the game PIN with `pin <pin>` or just type the number directly.
-2. Add bots using any of the syntax styles below.
-3. Type `help` anytime to list commands.
-4. Type `exit` to quit.
 
 ### Commands
 
