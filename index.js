@@ -20,6 +20,10 @@ function invisibleSuffix(index) {
   return result;
 }
 
+function toChars(s) {
+  return Array.from(String(s || ""));
+}
+
 const bots = new Map();
 const joining = new Set();
 const pendingKick = new Set();
@@ -141,9 +145,9 @@ function setCursorVisible(visible) {
 
 function renderInput() {
   const prompt = currentPrompt();
-  const chars = Array.from(inputBuffer);
+  const chars = toChars(inputBuffer);
   const totalWidth = Math.max(1, (inputBox.width || 1) - 4);
-  const promptChars = Array.from(prompt).length;
+  const promptChars = toChars(prompt).length;
   const fieldWidth = Math.max(1, totalWidth - promptChars);
 
   if (cursorIndex < inputScroll) {
@@ -170,12 +174,12 @@ function renderInput() {
 
 function setInputBuffer(value) {
   inputBuffer = value;
-  cursorIndex = Array.from(value).length;
+  cursorIndex = toChars(value).length;
   inputScroll = 0;
 }
 
 function insertChar(ch) {
-  const chars = Array.from(inputBuffer);
+  const chars = toChars(inputBuffer);
   chars.splice(cursorIndex, 0, ch);
   inputBuffer = chars.join("");
   cursorIndex += 1;
@@ -185,14 +189,14 @@ function removeCharBeforeCursor() {
   if (cursorIndex <= 0) {
     return;
   }
-  const chars = Array.from(inputBuffer);
+  const chars = toChars(inputBuffer);
   chars.splice(cursorIndex - 1, 1);
   inputBuffer = chars.join("");
   cursorIndex -= 1;
 }
 
 function removeCharAtCursor() {
-  const chars = Array.from(inputBuffer);
+  const chars = toChars(inputBuffer);
   if (cursorIndex >= chars.length) {
     return;
   }
@@ -749,7 +753,7 @@ screen.on("keypress", (ch, key) => {
     return;
   }
   if (key && key.name === "right") {
-    cursorIndex = Math.min(Array.from(inputBuffer).length, cursorIndex + 1);
+    cursorIndex = Math.min(toChars(inputBuffer).length, cursorIndex + 1);
     renderInput();
     return;
   }
@@ -759,7 +763,7 @@ screen.on("keypress", (ch, key) => {
     return;
   }
   if (key && key.name === "end") {
-    cursorIndex = Array.from(inputBuffer).length;
+    cursorIndex = toChars(inputBuffer).length;
     renderInput();
     return;
   }
