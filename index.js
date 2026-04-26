@@ -495,7 +495,7 @@ async function kickBot(name) {
 }
 
 async function kickAll() {
-  const names = [...Array.from(bots.keys()), ...Array.from(joining.values())];
+  const names = [...bots.keys(), ...joining];
 
   for (const name of names) {
     const cleanName = String(name || "").trim();
