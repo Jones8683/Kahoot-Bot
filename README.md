@@ -38,4 +38,4 @@ node index.js
 | `help` | Show available commands |
 | `exit` | Quit the program |
 
-<img width="1920" height="960" alt="Mockup" src="https://github.com/user-attachments/assets/035d66d6-7a64-41f5-8c80-f703fa90f096" />
+<img width="1666" height="980" alt="Mockup" src="https://github.com/user-attachments/assets/ba56ae83-dd05-4192-a983-4b9bf6b396dc" />
