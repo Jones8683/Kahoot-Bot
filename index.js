@@ -517,8 +517,6 @@ function showHelp() {
   logStatus("info", "  add <base>~<count>");
   logStatus("info", "  kick <name>");
   logStatus("info", "  kick all");
-  logStatus("info", "  list");
-  logStatus("info", "  clear");
   logStatus("info", "  help");
   logStatus("info", "  exit");
 }
@@ -591,22 +589,6 @@ async function handleCommand(text) {
     } else {
       logStatus("info", `PIN already ${gamePin}`);
     }
-    return;
-  }
-
-  if (/^clear$/i.test(clean)) {
-    logsBox.setContent("");
-    logStatus("info", "Log cleared");
-    return;
-  }
-
-  if (/^list$/i.test(clean)) {
-    const names = Array.from(bots.keys()).reverse();
-    if (names.length === 0) {
-      logStatus("info", "No active bots");
-      return;
-    }
-    logStatus("info", `Active: ${names.join(", ")}`);
     return;
   }
 

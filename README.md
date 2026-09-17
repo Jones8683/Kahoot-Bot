@@ -37,8 +37,6 @@ npm start
 | `add <base>~<count>` | Add multiple bots with exact duplicate names   |
 | `kick <name>`        | Remove a specific bot from the game            |
 | `kick all`           | Remove all bots at once                        |
-| `list`               | Display all active bots                        |
-| `clear`              | Clear the screen                               |
 | `help`               | Show available commands                        |
 | `exit`               | Quit the program                               |
 
