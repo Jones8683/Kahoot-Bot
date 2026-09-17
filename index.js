@@ -348,12 +348,11 @@ function uniqueNames(names) {
       continue;
     }
 
-    const key = cleanName.toLowerCase();
-    if (seen.has(key)) {
+    if (seen.has(cleanName)) {
       continue;
     }
 
-    seen.add(key);
+    seen.add(cleanName);
     output.push(cleanName);
   }
 
