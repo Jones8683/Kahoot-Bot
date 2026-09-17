@@ -162,10 +162,7 @@ function renderInput() {
 
   screen.render();
 
-  const relativeCursor = Math.max(
-    0,
-    Math.min(fieldWidth, cursorIndex - inputScroll),
-  );
+  const relativeCursor = Math.max(0, Math.min(fieldWidth, cursorIndex - inputScroll));
   const row = inputBox.atop + 1;
   const col = inputBox.aleft + 2 + promptChars + relativeCursor;
   setCursorVisible(true);
@@ -233,18 +230,10 @@ function randomAnswer(question) {
   ) {
     return Math.floor(Math.random() * question.quizQuestionAnswers.length);
   }
-  if (
-    question &&
-    Array.isArray(question.choices) &&
-    question.choices.length > 0
-  ) {
+  if (question && Array.isArray(question.choices) && question.choices.length > 0) {
     return Math.floor(Math.random() * question.choices.length);
   }
-  if (
-    question &&
-    Number.isInteger(question.numberOfChoices) &&
-    question.numberOfChoices > 0
-  ) {
+  if (question && Number.isInteger(question.numberOfChoices) && question.numberOfChoices > 0) {
     return Math.floor(Math.random() * question.numberOfChoices);
   }
   return Math.floor(Math.random() * 4);
@@ -270,11 +259,7 @@ function refreshBots() {
   const names = Array.from(bots.keys()).reverse();
 
   const count = names.length;
-  botsBox.setLabel(
-    count > 0
-      ? ` Active Bots {yellow-fg}(${count}){/yellow-fg} `
-      : " Active Bots ",
-  );
+  botsBox.setLabel(count > 0 ? ` Active Bots {yellow-fg}(${count}){/yellow-fg} ` : " Active Bots ");
 
   if (names.length === 0) {
     botsBox.setContent("(none)");
@@ -741,9 +726,7 @@ screen.on("keypress", (ch, key) => {
       return;
     }
     historyIndex -= 1;
-    setInputBuffer(
-      historyIndex === -1 ? historySavedInput : commandHistory[historyIndex],
-    );
+    setInputBuffer(historyIndex === -1 ? historySavedInput : commandHistory[historyIndex]);
     renderInput();
     return;
   }
