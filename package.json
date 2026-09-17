@@ -2,7 +2,7 @@
   "name": "kahoot-bot",
   "version": "1.0.0",
   "private": true,
-  "main": "index.js",
+  "description": "Instantly flood Kahoots with customisable bots",
   "scripts": {
     "start": "node index.js"
   },

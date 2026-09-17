@@ -1,5 +1,5 @@
 # Kahoot Bot
-### Features
+### Features:
 - Flood Kahoots with bots named whatever you want
 - Join multiple bots with the exact same name
 - Manage different bots individually
@@ -20,7 +20,7 @@ Double-click `run.bat`
 
 ### Run From Terminal
 ```bash
-node index.js
+npm start
 ```
 
 ### Commands
