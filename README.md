@@ -16,9 +16,6 @@ npm install
 ```
 
 ### Run
-Double-click `run.bat`
-
-### Run From Terminal
 ```bash
 npm start
 ```
