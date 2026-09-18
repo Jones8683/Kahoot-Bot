@@ -36,6 +36,7 @@ let shuttingDown = false;
 const commandHistory = [];
 let historyIndex = -1;
 let historySavedInput = "";
+let commandQueue = Promise.resolve();
 
 const screen = blessed.screen({
   smartCSR: true,
@@ -67,7 +68,7 @@ const header = blessed.box({
 const botsBox = blessed.box({
   top: 3,
   left: 0,
-  width: "45%",
+  width: "35%",
   bottom: 3,
   tags: true,
   padding: { left: 1, right: 1 },
@@ -88,12 +89,12 @@ const botsBox = blessed.box({
 
 const logsBox = blessed.log({
   top: 3,
-  left: "45%",
-  width: "55%",
+  left: "35%",
+  width: "65%",
   bottom: 3,
   tags: true,
   padding: { left: 1, right: 1 },
-  label: " Status ",
+  label: " Logs ",
   border: { type: "line" },
   scrollable: true,
   alwaysScroll: true,
@@ -363,56 +364,31 @@ function parseNameExpression(raw) {
     return { names: [], error: "name is required" };
   }
 
-  const starPattern = text.match(/^(.*?)\s*\*\s*(\d+)$/);
-  if (starPattern) {
-    const base = starPattern[1].trim();
-    const count = Number.parseInt(starPattern[2], 10);
-
+  const pattern = text.match(/^(.*?)\s*([*~])\s*(\d+)$/);
+  if (pattern) {
+    const base = pattern[1].trim();
+    const count = Number.parseInt(pattern[3], 10);
     if (!base) {
       return { names: [], error: "base name cannot be empty" };
     }
     if (!Number.isFinite(count) || count <= 0) {
-      return { names: [], error: "pattern count must be a positive number" };
+      return {
+        names: [],
+        error: `${pattern[2] === "*" ? "pattern" : "clone"} count must be a positive number`,
+      };
     }
     if (count > MAX_BATCH_SIZE) {
       return {
         names: [],
-        error: `pattern count too large (max ${MAX_BATCH_SIZE})`,
+        error: `${pattern[2] === "*" ? "pattern" : "clone"} count too large (max ${MAX_BATCH_SIZE})`,
       };
     }
 
-    const names = [];
-    for (let i = 0; i < count; i += 1) {
-      names.push(`${base}${i + 1}`);
-    }
-
-    return { names, error: "" };
-  }
-
-  const clonePattern = text.match(/^(.*?)\s*~\s*(\d+)$/);
-  if (clonePattern) {
-    const base = clonePattern[1].trim();
-    const count = Number.parseInt(clonePattern[2], 10);
-
-    if (!base) {
-      return { names: [], error: "base name cannot be empty" };
-    }
-    if (!Number.isFinite(count) || count <= 0) {
-      return { names: [], error: "clone count must be a positive number" };
-    }
-    if (count > MAX_BATCH_SIZE) {
-      return {
-        names: [],
-        error: `clone count too large (max ${MAX_BATCH_SIZE})`,
-      };
-    }
-
-    const names = [];
-    for (let i = 0; i < count; i += 1) {
-      names.push(`${base}${invisibleSuffix(i)}`);
-    }
-
-    return { names, error: "" };
+    const suffix = pattern[2] === "*" ? (index) => index + 1 : invisibleSuffix;
+    return {
+      names: Array.from({ length: count }, (_, index) => `${base}${suffix(index)}`),
+      error: "",
+    };
   }
 
   return { names: [text], error: "" };
@@ -444,7 +420,7 @@ async function addMany(names, parallelLimit) {
   await Promise.all(tasks);
 }
 
-async function kickBot(name) {
+function kickBot(name) {
   const cleanName = String(name || "").trim();
   if (!cleanName) {
     logStatus("warn", "kick requires a bot name");
@@ -476,7 +452,7 @@ async function kickBot(name) {
   return true;
 }
 
-async function kickAll() {
+function kickAll() {
   const names = [...bots.keys(), ...joining];
 
   for (const name of names) {
@@ -580,7 +556,7 @@ async function handleCommand(text) {
     }
 
     if (nextPin !== gamePin) {
-      await kickAll();
+      kickAll();
       gamePin = nextPin;
       logStatus("ok", `PIN set to ${gamePin}`);
     } else {
@@ -590,14 +566,14 @@ async function handleCommand(text) {
   }
 
   if (/^kick\s+all$/i.test(clean)) {
-    await kickAll();
+    kickAll();
     logStatus("info", "All bots removed");
     return;
   }
 
   const kickMatch = clean.match(/^kick\s+(.+)$/i);
   if (kickMatch) {
-    await kickBot(kickMatch[1]);
+    kickBot(kickMatch[1]);
     return;
   }
 
@@ -624,10 +600,12 @@ function submitCurrentInput() {
 
   renderInput();
 
-  handleCommand(value).catch(async (err) => {
-    logStatus("err", `Fatal error: ${formatError(err)}`);
-    await shutdown(1);
-  });
+  commandQueue = commandQueue
+    .then(() => handleCommand(value))
+    .catch((err) => {
+      logStatus("err", `Fatal error: ${formatError(err)}`);
+      return shutdown(1);
+    });
 }
 
 async function shutdown(exitCode) {
@@ -637,7 +615,7 @@ async function shutdown(exitCode) {
   shuttingDown = true;
 
   try {
-    await kickAll();
+    kickAll();
   } catch (_err) {}
 
   setCursorVisible(true);
