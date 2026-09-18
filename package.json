@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Instantly flood Kahoots with customisable bots",
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },

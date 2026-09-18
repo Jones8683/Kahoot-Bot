@@ -1,7 +1,5 @@
-"use strict";
-
-const blessed = require("blessed");
-const Kahoot = require("kahoot.js-latest");
+import blessed from "blessed";
+import Kahoot from "kahoot.js-latest";
 
 const MAX_BATCH_SIZE = 10000;
 const DEFAULT_PARALLEL_JOINS = 35;
