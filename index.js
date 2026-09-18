@@ -4,6 +4,12 @@ import Kahoot from "kahoot.js-latest";
 const MAX_BATCH_SIZE = 10000;
 const DEFAULT_PARALLEL_JOINS = 35;
 const HEADER_COLOR = "magenta";
+const STATUS_STYLES = {
+  info: { symbol: "[i]", color: "cyan" },
+  ok: { symbol: "[+]", color: "green" },
+  warn: { symbol: "[!]", color: "yellow" },
+  err: { symbol: "[x]", color: "red" },
+};
 
 const INVIS = ["\u200B", "\u200C", "\u200D", "\u2060"];
 
@@ -22,13 +28,9 @@ function toChars(s) {
   return Array.from(String(s || ""));
 }
 
-const bots = new Map();
-const joining = new Set();
-const pendingKick = new Set();
-const mutedDisconnect = new Set();
+const botStates = new Map();
 
 let gamePin = 0;
-let waitingForPin = true;
 let inputBuffer = "";
 let cursorIndex = 0;
 let inputScroll = 0;
@@ -37,6 +39,17 @@ const commandHistory = [];
 let historyIndex = -1;
 let historySavedInput = "";
 let commandQueue = Promise.resolve();
+const PANEL_OPTIONS = {
+  tags: true,
+  padding: { left: 1, right: 1 },
+  border: { type: "line" },
+};
+const SCROLL_OPTIONS = {
+  scrollable: true,
+  alwaysScroll: true,
+  mouse: true,
+  scrollbar: { bg: "gray" },
+};
 
 const screen = blessed.screen({
   smartCSR: true,
@@ -48,15 +61,19 @@ const screen = blessed.screen({
   },
 });
 
-const header = blessed.box({
+function createPanel(type, options) {
+  return blessed[type]({
+    ...PANEL_OPTIONS,
+    ...options,
+  });
+}
+
+const header = createPanel("box", {
   top: 0,
   left: 0,
   width: "100%",
   height: 3,
-  tags: true,
-  padding: { left: 1, right: 1 },
   content: "{bold}Kahoot Bot Manager{/bold}\nType help for commands",
-  border: { type: "line" },
   style: {
     fg: HEADER_COLOR,
     bg: "#1f1230",
@@ -65,20 +82,14 @@ const header = blessed.box({
   },
 });
 
-const botsBox = blessed.box({
+const botsBox = createPanel("box", {
   top: 3,
   left: 0,
   width: "35%",
   bottom: 3,
-  tags: true,
-  padding: { left: 1, right: 1 },
+  ...SCROLL_OPTIONS,
   label: " Active Bots ",
-  border: { type: "line" },
   content: "(none)",
-  scrollable: true,
-  alwaysScroll: true,
-  mouse: true,
-  scrollbar: { bg: "gray" },
   style: {
     fg: "white",
     bg: "#2d2a10",
@@ -87,19 +98,13 @@ const botsBox = blessed.box({
   },
 });
 
-const logsBox = blessed.log({
+const logsBox = createPanel("log", {
   top: 3,
   left: "35%",
   width: "65%",
   bottom: 3,
-  tags: true,
-  padding: { left: 1, right: 1 },
+  ...SCROLL_OPTIONS,
   label: " Logs ",
-  border: { type: "line" },
-  scrollable: true,
-  alwaysScroll: true,
-  mouse: true,
-  scrollbar: { bg: "gray" },
   style: {
     fg: "white",
     bg: "#3d3410",
@@ -108,15 +113,12 @@ const logsBox = blessed.log({
   },
 });
 
-const inputBox = blessed.box({
+const inputBox = createPanel("box", {
   bottom: 0,
   left: 0,
   width: "100%",
   height: 3,
-  tags: true,
-  padding: { left: 1, right: 1 },
   label: " Input ",
-  border: { type: "line" },
   style: {
     fg: "white",
     bg: "#0f2e13",
@@ -131,7 +133,7 @@ screen.append(logsBox);
 screen.append(inputBox);
 
 function currentPrompt() {
-  return waitingForPin ? "PIN> " : "CMD> ";
+  return gamePin ? "CMD> " : "PIN> ";
 }
 
 function setCursorVisible(visible) {
@@ -201,11 +203,9 @@ function removeCharAtCursor() {
 }
 
 function formatError(err) {
-  if (err && err.description) {
-    return String(err.description);
-  }
-  if (err && err.message) {
-    return String(err.message);
+  if (err && typeof err === "object") {
+    if (err.description) return String(err.description);
+    if (err.message) return String(err.message);
   }
   if (typeof err === "string") {
     return err;
@@ -214,11 +214,12 @@ function formatError(err) {
 }
 
 function parsePin(value) {
-  const pin = Number.parseInt(value, 10);
-  if (!Number.isFinite(pin) || pin <= 0) {
+  const text = String(value || "").trim();
+  if (!/^\d+$/.test(text)) {
     return 0;
   }
-  return pin;
+  const pin = Number(text);
+  return Number.isSafeInteger(pin) && pin > 0 ? pin : 0;
 }
 
 function randomAnswer(question) {
@@ -239,13 +240,7 @@ function randomAnswer(question) {
 }
 
 function logStatus(level, text) {
-  const palette = {
-    info: { symbol: "[i]", color: "cyan" },
-    ok: { symbol: "[+]", color: "green" },
-    warn: { symbol: "[!]", color: "yellow" },
-    err: { symbol: "[x]", color: "red" },
-  };
-  const entry = palette[level] || palette.info;
+  const entry = STATUS_STYLES[level] || STATUS_STYLES.info;
 
   logsBox.log(
     `{${entry.color}-fg}{bold}${entry.symbol}{/bold}{/${entry.color}-fg}  {white-fg}${text}{/white-fg}`,
@@ -254,8 +249,19 @@ function logStatus(level, text) {
   renderInput();
 }
 
+function leaveBot(name, client) {
+  try {
+    client.leave(true);
+  } catch (err) {
+    logStatus("warn", `${name} could not be removed: ${formatError(err)}`);
+  }
+}
+
 function refreshBots() {
-  const names = Array.from(bots.keys()).reverse();
+  const names = Array.from(botStates.entries())
+    .filter(([, state]) => state.status === "active")
+    .map(([, state]) => state.name)
+    .reverse();
 
   const count = names.length;
   botsBox.setLabel(count > 0 ? ` Active Bots {yellow-fg}(${count}){/yellow-fg} ` : " Active Bots ");
@@ -270,41 +276,36 @@ function refreshBots() {
   renderInput();
 }
 
-function hasBot(name) {
-  const key = String(name || "").trim();
-  if (!key) {
-    return false;
-  }
-  return bots.has(key) || joining.has(key);
-}
-
 async function connectBot(name) {
   const cleanName = String(name || "").trim();
   if (!cleanName) {
     return "skipped";
   }
 
-  if (hasBot(cleanName)) {
-    logStatus("warn", `${cleanName} already exists`);
-    return "skipped";
-  }
-
-  joining.add(cleanName);
-
   const client = new Kahoot();
+  const botId = Symbol(cleanName);
+  botStates.set(botId, {
+    client,
+    name: cleanName,
+    status: "joining",
+    pendingKick: false,
+    mutedDisconnect: false,
+  });
 
   client.on("QuestionStart", (question) => {
     client.answer(randomAnswer(question)).catch(() => {});
   });
 
   client.on("Disconnect", (reason) => {
-    joining.delete(cleanName);
-    const existing = bots.get(cleanName);
-    if (existing === client) {
-      bots.delete(cleanName);
+    const state = botStates.get(botId);
+    if (!state || state.client !== client) {
+      return;
+    }
+    botStates.delete(botId);
+    if (state.status === "active") {
       refreshBots();
     }
-    if (mutedDisconnect.delete(cleanName)) {
+    if (state.mutedDisconnect) {
       return;
     }
     const msg = reason || "unknown";
@@ -313,49 +314,32 @@ async function connectBot(name) {
 
   try {
     await client.join(gamePin, cleanName);
-    joining.delete(cleanName);
+    const state = botStates.get(botId);
+    if (!state || state.client !== client) {
+      return "skipped";
+    }
 
-    if (pendingKick.has(cleanName)) {
-      pendingKick.delete(cleanName);
-      mutedDisconnect.add(cleanName);
-      try {
-        client.leave(true);
-      } catch (_err) {}
+    if (state.pendingKick) {
+      state.mutedDisconnect = true;
+      leaveBot(cleanName, client);
+      botStates.delete(botId);
       logStatus("info", `${cleanName} removed`);
       return "skipped";
     }
 
-    bots.set(cleanName, client);
+    state.status = "active";
     refreshBots();
     logStatus("ok", `${cleanName} connected`);
     return "connected";
   } catch (err) {
-    joining.delete(cleanName);
-    pendingKick.delete(cleanName);
+    botStates.delete(botId);
     logStatus("err", `${cleanName} failed: ${formatError(err)}`);
     return "failed";
   }
 }
 
-function uniqueNames(names) {
-  const seen = new Set();
-  const output = [];
-
-  for (const name of names) {
-    const cleanName = String(name || "").trim();
-    if (!cleanName) {
-      continue;
-    }
-
-    if (seen.has(cleanName)) {
-      continue;
-    }
-
-    seen.add(cleanName);
-    output.push(cleanName);
-  }
-
-  return output;
+function normalizeNames(names) {
+  return names.map((name) => String(name || "").trim()).filter(Boolean);
 }
 
 function parseNameExpression(raw) {
@@ -366,10 +350,10 @@ function parseNameExpression(raw) {
 
   const pattern = text.match(/^(.*?)\s*([*~])\s*(\d+)$/);
   if (pattern) {
-    const base = pattern[1].trim();
+    const name = pattern[1].trim();
     const count = Number.parseInt(pattern[3], 10);
-    if (!base) {
-      return { names: [], error: "base name cannot be empty" };
+    if (!name) {
+      return { names: [], error: "name cannot be empty" };
     }
     if (!Number.isFinite(count) || count <= 0) {
       return {
@@ -386,7 +370,7 @@ function parseNameExpression(raw) {
 
     const suffix = pattern[2] === "*" ? (index) => index + 1 : invisibleSuffix;
     return {
-      names: Array.from({ length: count }, (_, index) => `${base}${suffix(index)}`),
+      names: Array.from({ length: count }, (_, index) => `${name}${suffix(index)}`),
       error: "",
     };
   }
@@ -395,7 +379,7 @@ function parseNameExpression(raw) {
 }
 
 async function addMany(names, parallelLimit) {
-  const cleanNames = uniqueNames(names);
+  const cleanNames = normalizeNames(names);
   if (cleanNames.length === 0) {
     logStatus("warn", "No valid names");
     return;
@@ -420,6 +404,16 @@ async function addMany(names, parallelLimit) {
   await Promise.all(tasks);
 }
 
+function cleanupBot(botId, state = botStates.get(botId)) {
+  if (!state) {
+    return;
+  }
+  state.mutedDisconnect = true;
+  botStates.delete(botId);
+  refreshBots();
+  leaveBot(state.name, state.client);
+}
+
 function kickBot(name) {
   const cleanName = String(name || "").trim();
   if (!cleanName) {
@@ -427,87 +421,56 @@ function kickBot(name) {
     return false;
   }
 
-  if (joining.has(cleanName)) {
-    joining.delete(cleanName);
-    pendingKick.add(cleanName);
+  const entry = Array.from(botStates.entries())
+    .reverse()
+    .find(([, state]) => state.name === cleanName);
+  if (!entry) {
+    logStatus("warn", `${cleanName} not found`);
+    return false;
+  }
+  const [botId, state] = entry;
+
+  if (state.status === "joining") {
+    state.pendingKick = true;
     logStatus("info", `${cleanName} removed`);
     return true;
   }
 
-  const client = bots.get(cleanName);
-  if (!client) {
-    logStatus("warn", `${cleanName} not found`);
-    return false;
-  }
-
-  bots.delete(cleanName);
-  refreshBots();
-  mutedDisconnect.add(cleanName);
-
-  try {
-    client.leave(true);
-  } catch (_err) {}
-
+  cleanupBot(botId, state);
   logStatus("info", `${cleanName} removed`);
   return true;
 }
 
 function kickAll() {
-  const names = [...bots.keys(), ...joining];
-
-  for (const name of names) {
-    const cleanName = String(name || "").trim();
-    if (!cleanName) {
-      continue;
+  for (const [name, state] of botStates) {
+    if (state.status === "joining") {
+      state.pendingKick = true;
+    } else {
+      cleanupBot(name, state);
     }
-
-    if (joining.has(cleanName)) {
-      joining.delete(cleanName);
-      pendingKick.add(cleanName);
-      continue;
-    }
-
-    const client = bots.get(cleanName);
-    if (!client) {
-      continue;
-    }
-
-    bots.delete(cleanName);
-    mutedDisconnect.add(cleanName);
-    try {
-      client.leave(true);
-    } catch (_err) {}
   }
-
   refreshBots();
 }
-
 function showHelp() {
-  logStatus("info", "Command syntax:");
-  logStatus("info", "  pin <pin>");
-  logStatus("info", "  add <name>");
-  logStatus("info", "  add <base>*<count>");
-  logStatus("info", "  add <base>~<count>");
-  logStatus("info", "  kick <name>");
-  logStatus("info", "  kick all");
-  logStatus("info", "  help");
-  logStatus("info", "  exit");
+  logStatus("info", [
+    "Commands:",
+    "  pin <pin>",
+    "  add <name>",
+    "  add <name>*<count>",
+    "  add <name>~<count>",
+    "  kick <name>",
+    "  kick all",
+    "  help",
+    "  exit",
+  ].join("\n"));
 }
 
-function parsePinFromCommand(text) {
-  const clean = text.trim();
-  const pinCommand = clean.match(/^pin\s+(\d+)$/i);
-  if (pinCommand) {
-    return parsePin(pinCommand[1]);
+async function executeAdd(expression) {
+  if (!parsePin(gamePin)) {
+    commandError("Set a valid PIN before adding bots");
+    return;
   }
-  if (/^\d+$/.test(clean)) {
-    return parsePin(clean);
-  }
-  return 0;
-}
 
-async function executeAdd(text) {
-  const expression = text.replace(/^add\s+/i, "").trim();
   const parsed = parseNameExpression(expression);
 
   if (parsed.error) {
@@ -518,6 +481,51 @@ async function executeAdd(text) {
   await addMany(parsed.names, DEFAULT_PARALLEL_JOINS);
 }
 
+function commandError(message) {
+  logStatus("err", message);
+}
+
+function validateCommandArgs(command, args, { min = 0, max = Infinity, message } = {}) {
+  if (args.length < min || args.length > max) {
+    commandError(message || `${command} requires ${min} argument${min === 1 ? "" : "s"}`);
+    return false;
+  }
+  return true;
+}
+
+const COMMANDS = {
+  pin(tokens) {
+    if (!validateCommandArgs("pin", tokens, { min: 1, max: 1, message: "Invalid PIN" })) {
+      return;
+    }
+
+    const nextPin = parsePin(tokens[0]);
+    if (!nextPin) {
+      commandError("Invalid PIN");
+    } else if (nextPin !== gamePin) {
+      kickAll();
+      gamePin = nextPin;
+      logStatus("ok", `PIN set to ${gamePin}`);
+    } else {
+      logStatus("info", `PIN already ${gamePin}`);
+    }
+  },
+  add(_tokens, argument) {
+    return executeAdd(argument);
+  },
+  kick(tokens, argument) {
+    if (tokens.length === 1 && tokens[0].toLowerCase() === "all") {
+      kickAll();
+      logStatus("info", "All bots removed");
+      return;
+    }
+
+    if (validateCommandArgs("kick", tokens, { min: 1, message: "kick requires a bot name" })) {
+      kickBot(argument);
+    }
+  },
+};
+
 async function handleCommand(text) {
   const clean = text.trim();
   if (!clean) {
@@ -525,64 +533,37 @@ async function handleCommand(text) {
     return;
   }
 
-  if (/^(exit|quit)$/i.test(clean)) {
+  const [command, ...tokens] = clean.split(/\s+/);
+  const name = command.toLowerCase();
+  const argument = tokens.join(" ");
+
+  if (name === "exit" || name === "quit") {
     await shutdown(0);
     return;
   }
-
-  if (/^help$/i.test(clean)) {
+  if (name === "help") {
     showHelp();
     return;
   }
 
-  if (waitingForPin) {
-    const pin = parsePinFromCommand(clean);
+  if (!gamePin) {
+    const pin = parsePin(name === "pin" && tokens.length === 1 ? tokens[0] : command);
     if (!pin) {
-      logStatus("err", "Enter a numeric PIN first");
+      commandError("Enter a numeric PIN first");
       return;
     }
-
     gamePin = pin;
-    waitingForPin = false;
+    gamePin = pin;
     logStatus("ok", `PIN set to ${gamePin}`);
     return;
   }
 
-  if (/^pin\s+\d+$/i.test(clean)) {
-    const nextPin = parsePinFromCommand(clean);
-    if (!nextPin) {
-      logStatus("err", "Invalid PIN");
-      return;
-    }
-
-    if (nextPin !== gamePin) {
-      kickAll();
-      gamePin = nextPin;
-      logStatus("ok", `PIN set to ${gamePin}`);
-    } else {
-      logStatus("info", `PIN already ${gamePin}`);
-    }
+  const handler = COMMANDS[name];
+  if (!handler) {
+    commandError("Unknown command. Run help to list commands");
     return;
   }
-
-  if (/^kick\s+all$/i.test(clean)) {
-    kickAll();
-    logStatus("info", "All bots removed");
-    return;
-  }
-
-  const kickMatch = clean.match(/^kick\s+(.+)$/i);
-  if (kickMatch) {
-    kickBot(kickMatch[1]);
-    return;
-  }
-
-  if (/^add\s+/i.test(clean)) {
-    await executeAdd(clean);
-    return;
-  }
-
-  logStatus("err", "Unknown command. Run help to list commands");
+  await handler(tokens, argument);
 }
 
 function submitCurrentInput() {
@@ -616,7 +597,9 @@ async function shutdown(exitCode) {
 
   try {
     kickAll();
-  } catch (_err) {}
+  } catch (err) {
+    console.error(`Failed to remove bots during shutdown: ${formatError(err)}`);
+  }
 
   setCursorVisible(true);
   screen.destroy();
@@ -637,29 +620,17 @@ process.on("unhandledRejection", (reason) => {
   });
 });
 
-process.on("SIGHUP", () => {
+function handleExitSignal() {
   shutdown(0).catch(() => {
     process.exit(0);
   });
-});
+}
 
-process.on("SIGTERM", () => {
-  shutdown(0).catch(() => {
-    process.exit(0);
-  });
-});
+for (const signal of ["SIGHUP", "SIGTERM", "SIGINT"]) {
+  process.on(signal, handleExitSignal);
+}
 
-process.on("SIGINT", () => {
-  shutdown(0).catch(() => {
-    process.exit(0);
-  });
-});
-
-screen.key(["C-c"], () => {
-  shutdown(0).catch(() => {
-    process.exit(0);
-  });
-});
+screen.key(["C-c"], handleExitSignal);
 
 screen.on("keypress", (ch, key) => {
   if (key && key.name === "enter") {

@@ -33,8 +33,8 @@ npm start
 | -------------------- | ---------------------------------------------- |
 | `pin <pin>`          | Set the game PIN to connect to the Kahoot quiz |
 | `add <name>`         | Add a single bot to the game                   |
-| `add <base>*<count>` | Add multiple bots with sequential names        |
-| `add <base>~<count>` | Add multiple bots with exact duplicate names   |
+| `add <name>*<count>` | Add multiple bots with sequential names        |
+| `add <name>~<count>` | Add multiple bots with exact duplicate names   |
 | `kick <name>`        | Remove a specific bot from the game            |
 | `kick all`           | Remove all bots at once                        |
 | `help`               | Show available commands                        |
