@@ -203,14 +203,8 @@ function removeCharAtCursor() {
 }
 
 function formatError(err) {
-  if (err && typeof err === "object") {
-    if (err.description) return String(err.description);
-    if (err.message) return String(err.message);
-  }
-  if (typeof err === "string") {
-    return err;
-  }
-  return "unknown error";
+  if (typeof err === "string") return err;
+  return String(err?.description || err?.message || "unknown error");
 }
 
 function parsePin(value) {
@@ -466,7 +460,7 @@ function showHelp() {
 }
 
 async function executeAdd(expression) {
-  if (!parsePin(gamePin)) {
+  if (!gamePin) {
     commandError("Set a valid PIN before adding bots");
     return;
   }
@@ -552,7 +546,6 @@ async function handleCommand(text) {
       commandError("Enter a numeric PIN first");
       return;
     }
-    gamePin = pin;
     gamePin = pin;
     logStatus("ok", `PIN set to ${gamePin}`);
     return;
