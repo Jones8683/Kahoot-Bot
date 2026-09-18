@@ -246,8 +246,8 @@ function logStatus(level, text) {
 function leaveBot(name, client) {
   try {
     client.leave(true);
-  } catch (err) {
-    logStatus("warn", `${name} could not be removed: ${formatError(err)}`);
+  } catch {
+    logStatus("warn", `${name} could not be removed`);
   }
 }
 
@@ -290,7 +290,7 @@ async function connectBot(name) {
     client.answer(randomAnswer(question)).catch(() => {});
   });
 
-  client.on("Disconnect", (reason) => {
+  client.on("Disconnect", () => {
     const state = botStates.get(botId);
     if (!state || state.client !== client) {
       return;
@@ -302,8 +302,7 @@ async function connectBot(name) {
     if (state.mutedDisconnect) {
       return;
     }
-    const msg = reason || "unknown";
-    logStatus("warn", `${cleanName} disconnected: ${msg}`);
+    logStatus("warn", `${cleanName} disconnected`);
   });
 
   try {
@@ -325,9 +324,9 @@ async function connectBot(name) {
     refreshBots();
     logStatus("ok", `${cleanName} connected`);
     return "connected";
-  } catch (err) {
+  } catch {
     botStates.delete(botId);
-    logStatus("err", `${cleanName} failed: ${formatError(err)}`);
+    logStatus("err", `${cleanName} failed to join`);
     return "failed";
   }
 }
@@ -339,7 +338,7 @@ function normalizeNames(names) {
 function parseNameExpression(raw) {
   const text = String(raw || "").trim();
   if (!text) {
-    return { names: [], error: "name is required" };
+    return { names: [], error: "Invalid add command" };
   }
 
   const pattern = text.match(/^(.*?)\s*([*~])\s*(\d+)$/);
@@ -347,19 +346,13 @@ function parseNameExpression(raw) {
     const name = pattern[1].trim();
     const count = Number.parseInt(pattern[3], 10);
     if (!name) {
-      return { names: [], error: "name cannot be empty" };
+      return { names: [], error: "Invalid add command" };
     }
     if (!Number.isFinite(count) || count <= 0) {
-      return {
-        names: [],
-        error: "count must be a positive number",
-      };
+      return { names: [], error: "Invalid add command" };
     }
     if (count > MAX_BATCH_SIZE) {
-      return {
-        names: [],
-        error: `count too large (max ${MAX_BATCH_SIZE})`,
-      };
+      return { names: [], error: "Too many bots requested" };
     }
 
     const suffix = pattern[2] === "*" ? (index) => index + 1 : invisibleSuffix;
@@ -375,7 +368,7 @@ function parseNameExpression(raw) {
 async function addMany(names, parallelLimit) {
   const cleanNames = normalizeNames(names);
   if (cleanNames.length === 0) {
-    logStatus("warn", "No valid names");
+    logStatus("warn", "No bot names provided");
     return;
   }
 
@@ -411,7 +404,7 @@ function cleanupBot(botId, state = botStates.get(botId)) {
 function kickBot(name) {
   const cleanName = String(name || "").trim();
   if (!cleanName) {
-    logStatus("warn", "kick requires a bot name");
+    logStatus("warn", "Enter a bot name");
     return false;
   }
 
@@ -419,7 +412,7 @@ function kickBot(name) {
     .reverse()
     .find(([, state]) => state.name === cleanName);
   if (!entry) {
-    logStatus("warn", `${cleanName} not found`);
+    logStatus("warn", "Bot not found");
     return false;
   }
   const [botId, state] = entry;
@@ -461,7 +454,7 @@ function showHelp() {
 
 async function executeAdd(expression) {
   if (!gamePin) {
-    commandError("Set a valid PIN before adding bots");
+    commandError("Set a PIN before adding bots");
     return;
   }
 
@@ -543,7 +536,7 @@ async function handleCommand(text) {
   if (!gamePin) {
     const pin = parsePin(name === "pin" && tokens.length === 1 ? tokens[0] : command);
     if (!pin) {
-      commandError("Enter a numeric PIN first");
+      commandError("Enter a valid PIN first");
       return;
     }
     gamePin = pin;
