@@ -352,13 +352,13 @@ function parseNameExpression(raw) {
     if (!Number.isFinite(count) || count <= 0) {
       return {
         names: [],
-        error: `${pattern[2] === "*" ? "pattern" : "clone"} count must be a positive number`,
+        error: "count must be a positive number",
       };
     }
     if (count > MAX_BATCH_SIZE) {
       return {
         names: [],
-        error: `${pattern[2] === "*" ? "pattern" : "clone"} count too large (max ${MAX_BATCH_SIZE})`,
+        error: `count too large (max ${MAX_BATCH_SIZE})`,
       };
     }
 
@@ -626,70 +626,49 @@ for (const signal of ["SIGHUP", "SIGTERM", "SIGINT"]) {
 screen.key(["C-c"], handleExitSignal);
 
 screen.on("keypress", (ch, key) => {
-  if (key && key.name === "enter") {
-    submitCurrentInput();
-    return;
-  }
-  if (key && key.name === "up") {
-    if (commandHistory.length === 0) {
-      return;
-    }
-    if (historyIndex === -1) {
-      historySavedInput = inputBuffer;
-    }
-    historyIndex = Math.min(historyIndex + 1, commandHistory.length - 1);
-    setInputBuffer(commandHistory[historyIndex]);
-    renderInput();
-    return;
-  }
-  if (key && key.name === "down") {
-    if (historyIndex === -1) {
-      return;
-    }
-    historyIndex -= 1;
-    setInputBuffer(historyIndex === -1 ? historySavedInput : commandHistory[historyIndex]);
-    renderInput();
-    return;
-  }
-  if (key && key.name === "left") {
-    cursorIndex = Math.max(0, cursorIndex - 1);
-    renderInput();
-    return;
-  }
-  if (key && key.name === "right") {
-    cursorIndex = Math.min(toChars(inputBuffer).length, cursorIndex + 1);
-    renderInput();
-    return;
-  }
-  if (key && key.name === "home") {
-    cursorIndex = 0;
-    renderInput();
-    return;
-  }
-  if (key && key.name === "end") {
-    cursorIndex = toChars(inputBuffer).length;
-    renderInput();
-    return;
-  }
-  if (key && key.name === "backspace") {
-    removeCharBeforeCursor();
-    renderInput();
-    return;
-  }
-  if (key && key.name === "delete") {
-    removeCharAtCursor();
-    renderInput();
+  if (key?.ctrl) {
     return;
   }
 
-  if (key && key.ctrl) {
-    return;
+  switch (key?.name) {
+    case "enter":
+      submitCurrentInput();
+      return;
+    case "up":
+      if (commandHistory.length === 0) return;
+      if (historyIndex === -1) historySavedInput = inputBuffer;
+      historyIndex = Math.min(historyIndex + 1, commandHistory.length - 1);
+      setInputBuffer(commandHistory[historyIndex]);
+      break;
+    case "down":
+      if (historyIndex === -1) return;
+      historyIndex -= 1;
+      setInputBuffer(historyIndex === -1 ? historySavedInput : commandHistory[historyIndex]);
+      break;
+    case "left":
+      cursorIndex = Math.max(0, cursorIndex - 1);
+      break;
+    case "right":
+      cursorIndex = Math.min(toChars(inputBuffer).length, cursorIndex + 1);
+      break;
+    case "home":
+      cursorIndex = 0;
+      break;
+    case "end":
+      cursorIndex = toChars(inputBuffer).length;
+      break;
+    case "backspace":
+      removeCharBeforeCursor();
+      break;
+    case "delete":
+      removeCharAtCursor();
+      break;
+    default:
+      if (typeof ch !== "string" || ch < " " || ch === "\u007f") return;
+      insertChar(ch);
   }
 
-  if (typeof ch === "string" && ch >= " " && ch !== "\u007f") {
-    insertChar(ch);
-    renderInput();
-  }
+  renderInput();
 });
 
 screen.on("resize", () => {
