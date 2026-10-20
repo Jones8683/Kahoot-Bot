@@ -8,7 +8,7 @@ for (const method of ['log', 'info', 'warn', 'error']) {
   console[method] = (...args) => log('warn', format(...args));
 }
 
-log('info', 'Enter the game PIN to start, then type help to see commands');
+log('info', 'Enter game PIN • help for commands');
 
 const app = render(<App />, { alternateScreen: true, patchConsole: false });
 
