@@ -106,6 +106,10 @@ function invisibleSuffix(index) {
   return suffix;
 }
 
+function visibleName(name) {
+  return chars(name).filter((char) => !INVISIBLE_CHARS.includes(char)).join("");
+}
+
 function formatError(err) {
   if (typeof err === "string") return err;
   return String(err?.description || err?.message || "unknown error");
@@ -256,14 +260,14 @@ function removeBot(client) {
 }
 
 function kickBot(name) {
-  const client = [...bots].reverse().find(([, bot]) => bot.name === name)?.[0];
-  if (!client) {
+  const clients = [...bots].filter(([, bot]) => visibleName(bot.name) === name).map(([client]) => client);
+  if (!clients.length) {
     log("warn", "Bot not found");
     return;
   }
-  removeBot(client);
+  clients.forEach(removeBot);
   renderBots();
-  log("info", `${name} removed`);
+  log("info", clients.length === 1 ? `${name} removed` : `${name} removed x${clients.length}`);
 }
 
 function kickAll() {
