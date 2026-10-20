@@ -9,8 +9,6 @@
 
 ### Setup
 
-Requires [Node.js](https://nodejs.org) 22 or newer.
-
 1. Clone the repository
 
 ```bash
