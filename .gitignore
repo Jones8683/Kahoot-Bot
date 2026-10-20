@@ -1,3 +1,7 @@
 node_modules/
-npm-debug.log*
-*.tmp
+.idea/
+.env*
+.claude/
+.DS_Store
+*.log
+Thumbs.db
