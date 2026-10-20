@@ -1,7 +1,7 @@
-import { setTimeout as sleep } from "node:timers/promises";
-import Kahoot from "kahoot.js-latest";
-import { visibleName } from "./names.js";
-import { changed, log, state } from "./state.js";
+import { setTimeout as sleep } from 'node:timers/promises';
+import Kahoot from 'kahoot.js-latest';
+import { visibleName } from './names.js';
+import { changed, log, state } from './state.js';
 
 const PARALLEL_JOINS = 35;
 const LEAVE_DELAY = 600;
@@ -10,8 +10,8 @@ const batches = new Set();
 let nextBotId = 0;
 
 function formatError(err) {
-  if (typeof err === "string") return err;
-  return String(err?.description || err?.message || "unknown error");
+  if (typeof err === 'string') return err;
+  return String(err?.description || err?.message || 'unknown error');
 }
 
 function randomAnswer(question) {
@@ -31,7 +31,7 @@ function leave(client) {
 
 function joinGame(client, name) {
   return new Promise((resolve, reject) => {
-    client.once("Disconnect", reject);
+    client.once('Disconnect', reject);
     client.join(state.pin, name).then(resolve, reject);
   });
 }
@@ -41,7 +41,7 @@ async function connectBot(name) {
   state.bots.set(client, { id: nextBotId++, name, active: false });
   changed();
 
-  client.on("QuestionStart", (question) => {
+  client.on('QuestionStart', (question) => {
     client.answer(randomAnswer(question)).catch(() => {});
   });
 
@@ -60,12 +60,12 @@ async function connectBot(name) {
   }
 
   state.bots.get(client).active = true;
-  client.on("Disconnect", (reason) => {
+  client.on('Disconnect', (reason) => {
     if (!state.bots.delete(client)) return;
     changed();
     log(
-      "warn",
-      reason === "Kicked" ? `${name} was kicked by the host` : `${name} disconnected: ${reason}`,
+      'warn',
+      reason === 'Kicked' ? `${name} was kicked by the host` : `${name} disconnected: ${reason}`,
     );
   });
   changed();
@@ -86,18 +86,18 @@ function summarize(results, total) {
     }
   }
 
-  const reasons = [...failures].map(([reason, count]) => `${reason} x${count}`).join(", ");
+  const reasons = [...failures].map(([reason, count]) => `${reason} x${count}`).join(', ');
   log(
-    failed ? "warn" : "ok",
-    `${joined}/${total} joined` + (failed ? `, ${failed} failed (${reasons})` : ""),
+    failed ? 'warn' : 'ok',
+    `${joined}/${total} joined` + (failed ? `, ${failed} failed (${reasons})` : ''),
   );
 }
 
 export async function addBots(names) {
   if (names.length === 1) {
     const result = await connectBot(names[0]);
-    if (result?.joined) log("ok", `${names[0]} joined`);
-    else if (result) log("err", `${names[0]} failed to join: ${result.reason}`);
+    if (result?.joined) log('ok', `${names[0]} joined`);
+    else if (result) log('err', `${names[0]} failed to join: ${result.reason}`);
     return;
   }
 
@@ -129,12 +129,12 @@ export function kickBot(name) {
     .filter(([, bot]) => visibleName(bot.name) === name)
     .map(([client]) => client);
   if (clients.length === 0) {
-    log("warn", "Bot not found");
+    log('warn', 'Bot not found');
     return;
   }
   for (const client of clients) removeBot(client);
   changed();
-  log("info", clients.length === 1 ? `${name} removed` : `${name} removed x${clients.length}`);
+  log('info', clients.length === 1 ? `${name} removed` : `${name} removed x${clients.length}`);
 }
 
 export function kickAll() {

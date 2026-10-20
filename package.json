@@ -5,7 +5,11 @@
   "description": "Instantly flood Kahoots with customisable bots",
   "type": "module",
   "scripts": {
-    "start": "tsx src/index.jsx"
+    "start": "tsx src/index.jsx",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix"
   },
   "dependencies": {
     "ink": "^8.0.0",
@@ -13,6 +17,10 @@
     "kahoot.js-latest": "^1.0.9",
     "react": "^19.3.1",
     "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.74.0",
+    "oxlint": "^1.89.0"
   },
   "engines": {
     "node": ">=22"

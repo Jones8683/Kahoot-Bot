@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "unicorn", "oxc", "react", "import", "promise"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "error",
+    "perf": "error"
+  },
+  "rules": {
+    "max-lines-per-function": "off",
+    "no-await-in-loop": "off",
+    "react/react-in-jsx-scope": "off"
+  },
+  "env": {
+    "node": true,
+    "es2024": true
+  }
+}

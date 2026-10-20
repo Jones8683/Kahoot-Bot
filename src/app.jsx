@@ -1,14 +1,14 @@
-import { useState, useSyncExternalStore } from "react";
-import { Box, Text, useApp, useWindowSize } from "ink";
-import TextInput from "ink-text-input";
-import { runCommand } from "./commands.js";
-import { getSnapshot, subscribe } from "./state.js";
+import { useState, useSyncExternalStore } from 'react';
+import { Box, Text, useApp, useWindowSize } from 'ink';
+import TextInput from 'ink-text-input';
+import { runCommand } from './commands.js';
+import { getSnapshot, subscribe } from './state.js';
 
 const LOG_STYLES = {
-  info: { symbol: "i", color: "cyan" },
-  ok: { symbol: "+", color: "green" },
-  warn: { symbol: "!", color: "yellow" },
-  err: { symbol: "x", color: "red" },
+  info: { symbol: 'i', color: 'cyan' },
+  ok: { symbol: '+', color: 'green' },
+  warn: { symbol: '!', color: 'yellow' },
+  err: { symbol: 'x', color: 'red' },
 };
 
 function Panel({ title, color, alignBottom = false, children, ...props }) {
@@ -21,7 +21,7 @@ function Panel({ title, color, alignBottom = false, children, ...props }) {
         flexDirection="column"
         flexGrow={1}
         overflow="hidden"
-        justifyContent={alignBottom ? "flex-end" : "flex-start"}
+        justifyContent={alignBottom ? 'flex-end' : 'flex-start'}
       >
         <Box flexDirection="column" flexShrink={0}>
           {children}
@@ -35,10 +35,10 @@ export default function App() {
   const { exit } = useApp();
   const { columns, rows } = useWindowSize();
   const { pin, bots, joining, logs } = useSyncExternalStore(subscribe, getSnapshot);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState('');
 
   function submit(text) {
-    setInput("");
+    setInput('');
     if (text.trim()) runCommand(text.trim(), exit);
   }
 
@@ -50,7 +50,7 @@ export default function App() {
         </Text>
         {pin ? (
           <Text>
-            PIN{" "}
+            PIN{' '}
             <Text bold color="green">
               {pin}
             </Text>
@@ -77,16 +77,16 @@ export default function App() {
             <Text key={id}>
               <Text bold color={LOG_STYLES[level].color}>
                 {LOG_STYLES[level].symbol}
-              </Text>{" "}
+              </Text>{' '}
               {text}
             </Text>
           ))}
         </Panel>
       </Box>
-      <Panel title={pin ? "Command" : "Game PIN"} color="green" flexShrink={0}>
+      <Panel title={pin ? 'Command' : 'Game PIN'} color="green" flexShrink={0}>
         <Box>
           <Text bold color="green">
-            {"› "}
+            {'› '}
           </Text>
           <TextInput value={input} onChange={setInput} onSubmit={submit} />
         </Box>
