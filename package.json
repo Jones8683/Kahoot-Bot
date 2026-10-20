@@ -5,10 +5,17 @@
   "description": "Instantly flood Kahoots with customisable bots",
   "type": "module",
   "scripts": {
-    "start": "node index.js"
+    "start": "tsx src/index.jsx"
   },
   "dependencies": {
-    "blessed": "^0.1.81",
-    "kahoot.js-latest": "^1.0.9"
+    "ink": "^8.0.0",
+    "kahoot.js-latest": "^1.0.9",
+    "react": "^19.3.1",
+    "string-width": "^8.3.0",
+    "tsx": "^4.23.15",
+    "wrap-ansi": "^10.0.2"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
