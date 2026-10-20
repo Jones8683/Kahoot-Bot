@@ -7,6 +7,7 @@ const PARALLEL_JOINS = 35;
 const LEAVE_DELAY = 600;
 
 const batches = new Set();
+let nextBotId = 0;
 
 function formatError(err) {
   if (typeof err === "string") return err;
@@ -15,7 +16,10 @@ function formatError(err) {
 
 function randomAnswer(question) {
   const count =
-    question?.quizQuestionAnswers?.length || question?.choices?.length || question?.numberOfChoices || 4;
+    question?.quizQuestionAnswers?.length ||
+    question?.choices?.length ||
+    question?.numberOfChoices ||
+    4;
   return Math.floor(Math.random() * count);
 }
 
@@ -34,7 +38,7 @@ function joinGame(client, name) {
 
 async function connectBot(name) {
   const client = new Kahoot();
-  state.bots.set(client, { name, active: false });
+  state.bots.set(client, { id: nextBotId++, name, active: false });
   changed();
 
   client.on("QuestionStart", (question) => {
@@ -59,7 +63,10 @@ async function connectBot(name) {
   client.on("Disconnect", (reason) => {
     if (!state.bots.delete(client)) return;
     changed();
-    log("warn", reason === "Kicked" ? `${name} was kicked by the host` : `${name} disconnected: ${reason}`);
+    log(
+      "warn",
+      reason === "Kicked" ? `${name} was kicked by the host` : `${name} disconnected: ${reason}`,
+    );
   });
   changed();
   return { joined: true };
@@ -80,7 +87,10 @@ function summarize(results, total) {
   }
 
   const reasons = [...failures].map(([reason, count]) => `${reason} x${count}`).join(", ");
-  log(failed ? "warn" : "ok", `${joined}/${total} joined` + (failed ? `, ${failed} failed (${reasons})` : ""));
+  log(
+    failed ? "warn" : "ok",
+    `${joined}/${total} joined` + (failed ? `, ${failed} failed (${reasons})` : ""),
+  );
 }
 
 export async function addBots(names) {
@@ -102,7 +112,6 @@ export async function addBots(names) {
   }
 
   batches.add(batch);
-  log("info", `Adding ${names.length} bots`);
   await Promise.all(Array.from({ length: Math.min(PARALLEL_JOINS, names.length) }, worker));
   batches.delete(batch);
 
@@ -116,19 +125,21 @@ function removeBot(client) {
 }
 
 export function kickBot(name) {
-  const clients = [...state.bots].filter(([, bot]) => visibleName(bot.name) === name).map(([client]) => client);
-  if (!clients.length) {
+  const clients = [...state.bots]
+    .filter(([, bot]) => visibleName(bot.name) === name)
+    .map(([client]) => client);
+  if (clients.length === 0) {
     log("warn", "Bot not found");
     return;
   }
-  clients.forEach(removeBot);
+  for (const client of clients) removeBot(client);
   changed();
   log("info", clients.length === 1 ? `${name} removed` : `${name} removed x${clients.length}`);
 }
 
 export function kickAll() {
   for (const batch of batches) batch.cancelled = true;
-  for (const client of [...state.bots.keys()]) removeBot(client);
+  for (const client of state.bots.keys()) removeBot(client);
   changed();
 }
 

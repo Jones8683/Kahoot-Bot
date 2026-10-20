@@ -1,4 +1,4 @@
-const MAX_LOGS = 1000;
+const MAX_LOGS = 100;
 const REFRESH_DELAY = 50;
 
 export const state = { pin: 0, bots: new Map(), logs: [] };
@@ -10,7 +10,7 @@ let nextLogId = 0;
 
 function createSnapshot() {
   const bots = [...state.bots.values()];
-  const active = bots.filter((bot) => bot.active).map((bot) => bot.name).reverse();
+  const active = bots.filter((bot) => bot.active).toReversed();
   return { pin: state.pin, bots: active, joining: bots.length - active.length, logs: state.logs };
 }
 

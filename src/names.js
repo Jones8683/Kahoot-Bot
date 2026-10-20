@@ -1,5 +1,5 @@
 const MAX_BATCH_SIZE = 10000;
-const INVISIBLE_CHARS = ["​", "‌", "‍", "⁠"];
+const INVISIBLE_CHARS = ["\u200B", "\u200C", "\u200D", "\u2060"];
 
 function invisibleSuffix(index) {
   let suffix = "";
@@ -16,7 +16,7 @@ export function visibleName(name) {
 }
 
 export function parseNames(expression) {
-  const match = expression.match(/^(.*?)\s*([*~])\s*(\d+)$/);
+  const match = expression.match(/^(.*?)\s*([*~])\s*(\d+)$/u);
   if (!match) return { names: expression ? [expression] : [] };
 
   const [, name, mode, countText] = match;

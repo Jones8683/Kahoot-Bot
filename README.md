@@ -40,14 +40,4 @@ npm start
 | `help`               | Show available commands                        |
 | `exit`               | Remove all bots and quit the program           |
 
-### Keys
-
-| Key           | Action                                 |
-| ------------- | -------------------------------------- |
-| `Enter`       | Run the typed command                  |
-| `Up` / `Down` | Browse previous commands               |
-| `Tab`         | Switch between the Bots and Logs panel |
-| `PgUp/PgDn`   | Scroll the selected panel              |
-| `Ctrl+C`      | Remove all bots and quit the program   |
-
 <img width="1666" height="980" alt="Preview" src="Preview.png" />

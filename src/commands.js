@@ -4,18 +4,18 @@ import { log, state } from "./state.js";
 
 const HELP_TEXT = [
   "Commands:",
-  "  pin <pin>            Join a different game",
-  "  add <name>           Add one bot",
-  "  add <name>*<count>   Add bots named name1, name2, ...",
-  "  add <name>~<count>   Add bots that all show the same name",
-  "  kick <name>          Remove every bot with that name",
-  "  kick all             Remove all bots",
-  "  help                 Show this list",
-  "  exit                 Remove all bots and quit",
+  "  pin <pin>",
+  "  add <name>",
+  "  add <name>*<count>",
+  "  add <name>~<count>",
+  "  kick <name>",
+  "  kick all",
+  "  help",
+  "  exit",
 ].join("\n");
 
 function parsePin(text) {
-  if (!/^\d+$/.test(text)) return 0;
+  if (!/^\d+$/u.test(text)) return 0;
   const pin = Number(text);
   return Number.isSafeInteger(pin) && pin > 0 ? pin : 0;
 }
@@ -39,7 +39,7 @@ const COMMANDS = {
   pin: setPin,
   add(argument) {
     const { names, error } = parseNames(argument);
-    if (error || !names.length) {
+    if (error || names.length === 0) {
       log("err", error || "Enter a bot name");
     } else {
       addBots(names);
@@ -58,11 +58,9 @@ const COMMANDS = {
 };
 
 export function runCommand(text, exit) {
-  const [command, ...rest] = text.split(/\s+/);
+  const [command, ...rest] = text.split(/\s+/u);
   const name = command.toLowerCase();
   const argument = rest.join(" ");
-
-  log("cmd", text);
 
   if (name === "exit") {
     exit();
@@ -71,6 +69,6 @@ export function runCommand(text, exit) {
   } else if (COMMANDS[name]) {
     COMMANDS[name](argument);
   } else {
-    log("err", "Unknown command. Run help to list commands");
+    log("err", "Unknown command. Type help to see commands");
   }
 }
