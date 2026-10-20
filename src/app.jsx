@@ -31,6 +31,27 @@ function Panel({ title, color, alignBottom = false, children, ...props }) {
   );
 }
 
+function Header({ pin, joining }) {
+  return (
+    <Box paddingX={1} gap={3} flexShrink={0}>
+      <Text bold color="magenta">
+        Kahoot Bot Manager
+      </Text>
+      {pin ? (
+        <Text>
+          PIN{' '}
+          <Text bold color="green">
+            {pin}
+          </Text>
+        </Text>
+      ) : (
+        <Text color="yellow">No game PIN set</Text>
+      )}
+      {joining > 0 && <Text color="yellow">{joining} joining...</Text>}
+    </Box>
+  );
+}
+
 export default function App() {
   const { exit } = useApp();
   const { columns, rows } = useWindowSize();
@@ -44,22 +65,7 @@ export default function App() {
 
   return (
     <Box flexDirection="column" width={columns} height={rows}>
-      <Box paddingX={1} gap={3} flexShrink={0}>
-        <Text bold color="magenta">
-          Kahoot Bot Manager
-        </Text>
-        {pin ? (
-          <Text>
-            PIN{' '}
-            <Text bold color="green">
-              {pin}
-            </Text>
-          </Text>
-        ) : (
-          <Text color="yellow">No game PIN set</Text>
-        )}
-        {joining > 0 && <Text color="yellow">{joining} joining...</Text>}
-      </Box>
+      <Header pin={pin} joining={joining} />
       <Box flexGrow={1}>
         <Panel title={`Bots (${bots.length})`} color="yellow" width="35%">
           {bots.length > 0 ? (

@@ -72,7 +72,14 @@ async function connectBot(name) {
   return { joined: true };
 }
 
-function summarize(results, total) {
+function summarize(names, results) {
+  if (names.length === 1) {
+    const [result] = results;
+    if (result?.joined) log('ok', `${names[0]} joined`);
+    else if (result) log('err', `${names[0]} failed to join: ${result.reason}`);
+    return;
+  }
+
   const failures = new Map();
   let joined = 0;
   let failed = 0;
@@ -89,18 +96,11 @@ function summarize(results, total) {
   const reasons = [...failures].map(([reason, count]) => `${reason} x${count}`).join(', ');
   log(
     failed ? 'warn' : 'ok',
-    `${joined}/${total} joined` + (failed ? `, ${failed} failed (${reasons})` : ''),
+    `${joined}/${names.length} joined` + (failed ? `, ${failed} failed (${reasons})` : ''),
   );
 }
 
 export async function addBots(names) {
-  if (names.length === 1) {
-    const result = await connectBot(names[0]);
-    if (result?.joined) log('ok', `${names[0]} joined`);
-    else if (result) log('err', `${names[0]} failed to join: ${result.reason}`);
-    return;
-  }
-
   const batch = { cancelled: false };
   const results = [];
   let next = 0;
@@ -115,7 +115,7 @@ export async function addBots(names) {
   await Promise.all(Array.from({ length: Math.min(PARALLEL_JOINS, names.length) }, worker));
   batches.delete(batch);
 
-  if (!batch.cancelled) summarize(results, names.length);
+  if (!batch.cancelled) summarize(names, results);
 }
 
 function removeBot(client) {
@@ -128,13 +128,9 @@ export function kickBot(name) {
   const clients = [...state.bots]
     .filter(([, bot]) => visibleName(bot.name) === name)
     .map(([client]) => client);
-  if (clients.length === 0) {
-    log('warn', 'Bot not found');
-    return;
-  }
   for (const client of clients) removeBot(client);
   changed();
-  log('info', clients.length === 1 ? `${name} removed` : `${name} removed x${clients.length}`);
+  return clients.length;
 }
 
 export function kickAll() {

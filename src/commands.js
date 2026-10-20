@@ -52,7 +52,9 @@ const COMMANDS = {
       kickAll();
       log('info', 'All bots removed');
     } else {
-      kickBot(argument);
+      const count = kickBot(argument);
+      if (count === 0) log('warn', 'Bot not found');
+      else log('info', count === 1 ? `${argument} removed` : `${argument} removed x${count}`);
     }
   },
 };
