@@ -15,11 +15,7 @@ function formatError(err) {
 }
 
 function randomAnswer(question) {
-  const count =
-    question?.quizQuestionAnswers?.length ||
-    question?.choices?.length ||
-    question?.numberOfChoices ||
-    4;
+  const count = question?.quizQuestionAnswers?.[question.questionIndex] || 4;
   return Math.floor(Math.random() * count);
 }
 
