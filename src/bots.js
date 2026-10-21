@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import Kahoot from 'kahoot.js-latest';
+import { firstQuestionAnswer } from './answers.js';
 import { visibleName } from './names.js';
 import { changed, log, state } from './state.js';
 
@@ -37,8 +38,16 @@ async function connectBot(name) {
   state.bots.set(client, { id: nextBotId++, name, active: false });
   changed();
 
+  const knownAnswers = new Map();
+
+  client.on('QuizStart', (payload) => {
+    const answer = firstQuestionAnswer(payload);
+    if (answer) knownAnswers.set(answer.index, answer.choice);
+  });
+
   client.on('QuestionStart', (question) => {
-    client.answer(randomAnswer(question)).catch(() => {});
+    const known = knownAnswers.get(question.questionIndex);
+    client.answer(known ?? randomAnswer(question)).catch(() => {});
   });
 
   try {
