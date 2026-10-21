@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
-import { Box, Text, useApp, useWindowSize } from 'ink';
+import { Box, Text, useApp, useInput, useWindowSize } from 'ink';
 import TextInput from 'ink-text-input';
 import { runCommand } from './commands.js';
 import { getSnapshot, subscribe } from './state.js';
@@ -57,6 +57,14 @@ export default function App() {
   const { columns, rows } = useWindowSize();
   const { pin, bots, joining, logs } = useSyncExternalStore(subscribe, getSnapshot);
   const [input, setInput] = useState('');
+  const [scroll, setScroll] = useState(0);
+
+  useInput((_, key) => {
+    const page = Math.max(1, rows - 7);
+    if (key.pageUp)
+      setScroll((current) => Math.min(Math.max(0, logs.length - page - 1), current + page));
+    if (key.pageDown) setScroll((current) => Math.max(0, current - page));
+  });
 
   function submit(text) {
     setInput('');
@@ -78,8 +86,13 @@ export default function App() {
             <Text dimColor>No bots yet</Text>
           )}
         </Panel>
-        <Panel title="Logs" color="cyan" flexGrow={1} alignBottom>
-          {logs.map(({ id, level, text }) => (
+        <Panel
+          title={scroll > 0 ? 'Logs (scrolled up)' : 'Logs'}
+          color="cyan"
+          flexGrow={1}
+          alignBottom
+        >
+          {logs.slice(0, logs.length - scroll).map(({ id, level, text }) => (
             <Text key={id}>
               <Text bold color={LOG_STYLES[level].color}>
                 {LOG_STYLES[level].symbol}
