@@ -71,6 +71,6 @@ export function runCommand(text, exit) {
   } else if (COMMANDS[name]) {
     COMMANDS[name](argument);
   } else {
-    log('err', 'Unknown command. Type help to see commands');
+    log('err', 'Unknown command · help for commands');
   }
 }
