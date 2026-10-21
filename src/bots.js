@@ -1,11 +1,13 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import Kahoot from 'kahoot.js-latest';
-import { firstQuestionAnswer } from './answers.js';
 import { visibleName } from './names.js';
 import { changed, log, state } from './state.js';
 
 const PARALLEL_JOINS = 35;
 const LEAVE_DELAY = 600;
+const MIN_ANSWER_DELAY = 500;
+const MAX_ANSWER_DELAY = 3000;
+const ANSWER_ATTEMPTS = 2;
 
 const batches = new Set();
 let nextBotId = 0;
@@ -18,6 +20,12 @@ function formatError(err) {
 function randomAnswer(question) {
   const count = question?.quizQuestionAnswers?.[question.questionIndex] || 4;
   return Math.floor(Math.random() * count);
+}
+
+// Spread answers out so Kahoot doesn't drop a burst of them arriving at once
+function answerDelay(question) {
+  const max = Math.min(MAX_ANSWER_DELAY, (question?.timeAvailable || 20000) / 2);
+  return MIN_ANSWER_DELAY + Math.random() * Math.max(0, max - MIN_ANSWER_DELAY);
 }
 
 function leave(client) {
@@ -38,16 +46,18 @@ async function connectBot(name) {
   state.bots.set(client, { id: nextBotId++, name, active: false });
   changed();
 
-  const knownAnswers = new Map();
+  client.on('QuestionStart', async (question) => {
+    await sleep(answerDelay(question));
+    if (!state.bots.has(client)) return;
 
-  client.on('QuizStart', (payload) => {
-    const answer = firstQuestionAnswer(payload);
-    if (answer) knownAnswers.set(answer.index, answer.choice);
-  });
-
-  client.on('QuestionStart', (question) => {
-    const known = knownAnswers.get(question.questionIndex);
-    client.answer(known ?? randomAnswer(question)).catch(() => {});
+    const choice = randomAnswer(question);
+    for (let attempt = 1; attempt <= ANSWER_ATTEMPTS; attempt++) {
+      try {
+        await client.answer(choice);
+        return;
+      } catch {}
+    }
+    log('warn', `${name} couldn't answer question ${question.questionIndex + 1}`);
   });
 
   try {
