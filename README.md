@@ -40,4 +40,4 @@ npm start
 | `help`               | Show available commands                        |
 | `exit`               | Remove all bots and quit the program           |
 
-<img width="1666" height="980" alt="Preview" src="Preview.png" />
+<img width="1666" height="1012" alt="Preview" src="Preview.png" />
